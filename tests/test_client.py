@@ -18,8 +18,6 @@ from custom_components.microair_bt.microair.client import (
 from custom_components.microair_bt.microair.protocol import (
     Command,
     ProtocolError,
-    StartupMode,
-    mode_mask,
 )
 from tests.conftest import DEVICE, FakeRadio
 from tests.test_protocol import BANNED, eeprom_buffer, live_buffer
@@ -298,6 +296,22 @@ async def test_mask_rejects_invalid_values_without_sending(
     assert radio.clients[0].writes == [(WRITE_UUID, b'{"Cmd": ReadLive}', True)]
 
 
+@pytest.mark.parametrize("mode", [0x03, 0x1D, 0x07])
+async def test_mask_rejects_undefined_modes_before_io(
+    radio: FakeRadio, mode: int
+) -> None:
+    radio.replies = [
+        [eeprom_buffer(), b'{"Sts": Success}'],
+        [b'{"Sts": Success}'],
+    ]
+    client = MicroAirClient(DEVICE, max_attempts=2)
+    async with client.transaction():
+        with pytest.raises(ValueError, match="Startup mode must be"):
+            await client.write_startup_mask(mode)
+        assert not radio.clients[0].writes
+        assert radio.clients[0].is_connected
+
+
 async def test_public_run_cannot_bypass_mask_entry_point(radio: FakeRadio) -> None:
     client = MicroAirClient(DEVICE, max_attempts=2)
     async with client.transaction():
@@ -510,9 +524,20 @@ async def test_invalid_timeout_keeps_transaction_usable(
     assert radio.clients[0].writes == [(WRITE_UUID, b'{"Cmd": ReadLive}', True)]
 
 
-@pytest.mark.parametrize("write_mask", [False, True])
-async def test_truncated_capture_refused(radio: FakeRadio, write_mask: bool) -> None:
-    raw = (Path(__file__).parent / "fixtures" / "capture-06-ReadEEP.bin").read_bytes()
+@pytest.mark.parametrize(
+    ("fixture", "length"),
+    [
+        pytest.param("capture-06-ReadEEP.bin", 923, id="capture-06-923"),
+        pytest.param("capture-08-ReadEEP.bin", 1020, id="capture-08-1020"),
+    ],
+)
+@pytest.mark.parametrize("write_mask", [False, True], ids=["read", "write"])
+async def test_truncated_capture_refused(
+    radio: FakeRadio, write_mask: bool, fixture: str, length: int
+) -> None:
+    raw = (Path(__file__).parent / "fixtures" / fixture).read_bytes()[:length]
+    assert len(raw) == length
+    assert raw[:2] == b"\xfd\x03"
     radio.replies = [[raw, b'{"Sts": Success}'], [b'{"Sts": Success}']]
 
     client = MicroAirClient(DEVICE, max_attempts=2)
@@ -552,12 +577,11 @@ async def test_mask_refuses_forbidden_original_bits(
 ) -> None:
     raw = bytearray(eeprom_buffer())
     raw[906] = original
-    requested = mode_mask(original, StartupMode.RELEARN)
     radio.replies = [[bytes(raw), b'{"Sts": Success}'], [b'{"Sts": Success}']]
     client = MicroAirClient(DEVICE, max_attempts=2)
     async with client.transaction():
         with pytest.raises(ProtocolError, match="[Uu]nsupported.*mask"):
-            await client.write_startup_mask(requested)
+            await client.write_startup_mask(1)
     assert radio.clients[0].writes == [(WRITE_UUID, b'{"Cmd": ReadEEP}', True)]
 
 
@@ -569,7 +593,6 @@ async def test_mask_refuses_forbidden_original_bits(
         (0x10, 2, b"12"),
         (0x14, 1, b"15"),
         (0x1F, 1, b"1D"),
-        (0x00, 0x1D, b"01"),
     ],
 )
 async def test_mask_preserves_supported_original_bits(

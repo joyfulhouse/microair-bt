@@ -251,6 +251,18 @@ def test_eeprom_golden_captures() -> None:
     assert data.raw == complete
 
 
+def test_eeprom_rejects_1020_byte_partial_capture() -> None:
+    complete = (
+        Path(__file__).parent / "fixtures" / "capture-08-ReadEEP.bin"
+    ).read_bytes()
+    assert len(complete) == 1023
+    partial = complete[:1020]
+    assert len(partial) == 1020
+    assert partial[:2] == complete[:2] == b"\xfd\x03"
+    with pytest.raises(ProtocolError, match="length"):
+        parse_eeprom(partial)
+
+
 @pytest.mark.parametrize("length", [909, 923, 1023, 1100])
 def test_eeprom_requires_exact_length_prefix(length: int) -> None:
     raw = eeprom_buffer(length)
