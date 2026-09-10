@@ -17,7 +17,7 @@ from HA.
 | Public documentation / prior art collected | ✅ done — OEM relearn procedure + community ESPHome read path ([device-easystart-flex](device-easystart-flex.md)) |
 | Device located on an HA Bluetooth proxy | ❌ **not heard** in a 270 s passive scan — likely unpowered / A/C idle ([ha-proxy-coverage](ha-proxy-coverage.md)) |
 | Specification for the integration | ✅ v1.1 — [integration-plan](integration-plan.md); three-vendor /debate REVISE×3 folded in (`docs/claude/research/debate-spec-synthesis.md`); awaiting plan-gate ruling |
-| HA custom integration | ⏳ PR-1 protocol lib + probe, then PR-2 component — pending plan gate |
+| HA custom integration | 🔄 **PR-1 in tribunal** — [PR #1](https://github.com/joyfulhouse/microair-bt/pull/1) (protocol lib + BLE client + probe; gates green, spec-gate compliant, blocking reviews FINDINGS → fix wave r2 in flight) |
 | Live validation on real device | ⏳ blocked on hearing the unit |
 
 ## The one-paragraph answer
