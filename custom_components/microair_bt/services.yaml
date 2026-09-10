@@ -1,0 +1,38 @@
+set_startup_mode:
+  name: Set startup mode
+  description: >-
+    Store a startup mode on one EasyStart and check EEPROM readback. Requires
+    confirmation, an advertising device, and polling enabled. This does not
+    cycle the compressor or confirm that relearning completed. Select either
+    an entry or a device. Writes are never retried automatically.
+  fields:
+    entry:
+      name: Entry
+      description: The EasyStart configuration entry to control.
+      selector:
+        config_entry:
+          integration: microair_bt
+    device:
+      name: Device
+      description: The EasyStart device to control, instead of an entry.
+      selector:
+        device:
+          filter:
+            integration: microair_bt
+    mode:
+      name: Mode
+      required: true
+      selector:
+        select:
+          options:
+            - normal
+            - relearn
+            - default_ramp
+    confirm:
+      name: Confirm startup mode change
+      description: >-
+        Must be true. For relearn, follow the notification's OEM power-cycle
+        procedure and five successful starts of at least 30 seconds each.
+      required: true
+      selector:
+        boolean:

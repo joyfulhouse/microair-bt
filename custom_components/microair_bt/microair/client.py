@@ -11,11 +11,13 @@ import re
 from asyncio import sleep
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from enum import Enum
 
 from bleak import BleakClient
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.backends.service import BleakGATTServiceCollection
+from bleak.exc import BleakError
 from bleak_retry_connector import establish_connection
 
 from .protocol import (
@@ -51,6 +53,18 @@ class CommandFailed(ProtocolError):
 
 class CommandTimeout(TimeoutError):
     """The entire command, including the GATT write, exceeded its deadline."""
+
+
+class StartupModeRejected(ProtocolError):
+    """Preflight failed; no startup-mask write was attempted."""
+
+
+class StartupWriteState(Enum):
+    """Observed command phase, retained through transport failure and cleanup."""
+
+    NOT_ATTEMPTED = "not_attempted"
+    ATTEMPTED = "attempted"
+    ACKNOWLEDGED = "acknowledged"
 
 
 async def _finish_cleanup(task: asyncio.Task[None]) -> None:
@@ -96,6 +110,7 @@ class MicroAirClient:
         self._pending: asyncio.Future[bytes] | None = None
         self._command: Command | None = None
         self._buffer = bytearray()
+        self.startup_write_state = StartupWriteState.NOT_ATTEMPTED
 
     def _connected(self) -> BleakClient:
         if (
@@ -204,6 +219,8 @@ class MicroAirClient:
         if completion is Completion.FAIL:
             self._fail(CommandFailed(f"Command completion: {completion.value}"))
         elif completion is Completion.OK:
+            if self._command is Command.SET_STARTUP_MASK:
+                self.startup_write_state = StartupWriteState.ACKNOWLEDGED
             raw = bytes(self._buffer)
             try:
                 if self._command is Command.READ_EEP:
@@ -262,13 +279,17 @@ class MicroAirClient:
                     payload
                 ):
                     raise AssertionError("Payload violates command whitelist")
-                write_task = asyncio.create_task(
-                    client.write_gatt_char(
+
+                async def write() -> None:
+                    if cmd is Command.SET_STARTUP_MASK:
+                        self.startup_write_state = StartupWriteState.ATTEMPTED
+                    await client.write_gatt_char(
                         characteristic,
                         payload,
                         response="write" in characteristic.properties,
                     )
-                )
+
+                write_task = asyncio.create_task(write())
                 try:
                     await asyncio.wait(
                         (write_task, pending), return_when=asyncio.FIRST_COMPLETED
@@ -304,20 +325,29 @@ class MicroAirClient:
     async def read_eeprom(self, *, timeout: float = READ_EEP_TIMEOUT) -> EepromData:
         return parse_eeprom(await self.run(Command.READ_EEP, timeout=timeout))
 
-    async def write_startup_mask(self, mask: int) -> None:
+    async def write_startup_mask(self, mask: int) -> int:
         """Accept only modes 0, 1 or 2 and preserve fresh EEPROM bits 2–4.
 
         The transaction already verified the ST triplet. Its lock covers this
         fresh read and the write. Reject invalid modes before any device I/O.
+        Return the acknowledged mask for the caller's storage readback. An
+        acknowledgement alone does not prove that learning has completed.
         """
+        self.startup_write_state = StartupWriteState.NOT_ATTEMPTED
         if type(mask) is not int or mask not in (0x00, 0x01, 0x02):
-            raise ValueError("Startup mode must be 0 (normal), 1 (relearn) or 2 (ramp)")
-        eeprom = await self.read_eeprom()
+            raise StartupModeRejected(
+                "Startup mode must be 0 (normal), 1 (relearn) or 2 (ramp)"
+            )
+        try:
+            eeprom = await self.read_eeprom()
+        except (ProtocolError, BleakError, OSError) as error:
+            raise StartupModeRejected(f"EEPROM preflight failed: {error}") from error
         if eeprom.model not in CONTROL_MODELS:
-            raise ProtocolError(f"Unsupported control model: {eeprom.model}")
+            raise StartupModeRejected(f"Unsupported control model: {eeprom.model}")
         if has_unsupported_bits(eeprom.startup_mask):
-            raise ProtocolError(
+            raise StartupModeRejected(
                 f"Unsupported original startup mask: 0x{eeprom.startup_mask:02X}"
             )
         mask = (eeprom.startup_mask & 0x1C) | mask
         await self._run(Command.SET_STARTUP_MASK, mask, timeout=STARTUP_MASK_TIMEOUT)
+        return mask

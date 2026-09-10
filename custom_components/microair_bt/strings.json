@@ -1,0 +1,41 @@
+{
+  "title": "MicroAir EasyStart",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect an EasyStart",
+        "description": "Enter the Bluetooth address while the EasyStart is powered and advertising. Close the OEM app so it can accept a connection.",
+        "data": {
+          "address": "Bluetooth address"
+        }
+      },
+      "bluetooth_confirm": {
+        "title": "Connect {name}",
+        "description": "Confirm setup while this EasyStart is powered. Its model will be checked before an entry is created."
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot read this EasyStart. Check that it is powered, an active Bluetooth adapter or proxy is in range, and the OEM app is disconnected.",
+      "invalid_address": "Enter an address in AA:BB:CC:DD:EE:FF format."
+    },
+    "abort": {
+      "already_configured": "This EasyStart is already configured.",
+      "unsupported_model": "This model is not supported for startup-mode control."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "EasyStart options",
+        "data": {
+          "poll_interval": "Minimum polling interval (seconds)",
+          "allow_running": "Allow explicit startup-mode writes while the compressor is running"
+        },
+        "description": "Polling requires advertisements. Turn off the Polling switch to pause all reads and writes during OEM maintenance. The pause survives restarts."
+      }
+    },
+    "error": {
+      "invalid_interval": "The polling interval must be an integer of at least 15 seconds."
+    }
+  }
+}

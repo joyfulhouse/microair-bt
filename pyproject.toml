@@ -3,16 +3,25 @@ name = "microair-bt"
 version = "0.1.0"
 description = "Local Bluetooth protocol library for MicroAir EasyStart"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.13.2"
 license = "MIT"
-dependencies = ["bleak>=3.0.2", "bleak-retry-connector>=4.7.0"]
+dependencies = ["bleak>=2.0.0", "bleak-retry-connector>=4.4.3"]
 
 [dependency-groups]
 dev = [
-    "pytest>=9.1.1",
-    "pytest-asyncio>=1.4.0",
+    # Exercise the minimum supported HA release and its bundled BLE stack.
+    "pytest-homeassistant-custom-component==0.13.308",
+    "bleak==2.0.0",
+    "bleak-retry-connector==4.4.3",
+    "bluetooth-adapters==2.1.0",
+    "bluetooth-auto-recovery==1.5.3",
+    "bluetooth-data-tools==1.28.4",
+    "dbus-fast==3.1.2",
+    "habluetooth==5.8.0",
     "ruff>=0.16.6",
     "mypy>=2.3.1",
+    "aiousbwatcher==1.1.1",
+    "pyserial==3.5",
 ]
 
 [tool.pytest.ini_options]
@@ -25,3 +34,4 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.mypy]
 explicit_package_bases = true
+mypy_path = "tests/stubs"

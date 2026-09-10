@@ -1,0 +1,14 @@
+{
+  "domain": "microair_bt",
+  "name": "MicroAir EasyStart",
+  "bluetooth": [{"local_name": "EasyStart_*", "connectable": false}],
+  "codeowners": ["@btli"],
+  "config_flow": true,
+  "dependencies": ["bluetooth"],
+  "documentation": "https://github.com/joyfulhouse/microair-bt",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/joyfulhouse/microair-bt/issues",
+  "requirements": [],
+  "version": "0.2.0"
+}
