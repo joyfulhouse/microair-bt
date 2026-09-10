@@ -258,12 +258,15 @@ async def test_malformed_or_overflow_poisons(
 async def test_mask_drops_binary_and_warns(
     radio: FakeRadio, caplog: pytest.LogCaptureFixture
 ) -> None:
-    radio.replies = [[bytes(2000), b"Success"]]
+    radio.replies = [[eeprom_buffer(), b"Success"], [bytes(2000), b"Success"]]
     client = MicroAirClient(DEVICE, max_attempts=4)
     async with client.transaction():
         await client.write_startup_mask(0x1F)
     assert "binary" in caplog.text.lower()
-    assert radio.clients[0].writes == [(WRITE_UUID, b'{"Cmd": SMask=1F}', True)]
+    assert radio.clients[0].writes == [
+        (WRITE_UUID, b'{"Cmd": ReadEEP}', True),
+        (WRITE_UUID, b'{"Cmd": SMask=1F}', True),
+    ]
 
 
 @pytest.mark.parametrize("bad", [-1, 32, None, True, "01", b"01", 1.0])
@@ -271,10 +274,14 @@ async def test_mask_rejects_invalid_values_without_sending(
     radio: FakeRadio, bad: object
 ) -> None:
     client = MicroAirClient(DEVICE, max_attempts=4)
+    radio.replies = [[live_buffer(), b"Success"]]
     async with client.transaction():
         with pytest.raises((ValueError, TypeError)):
             await client.write_startup_mask(cast(int, bad))
-    assert not radio.clients[0].writes
+        assert not radio.clients[0].writes
+        assert radio.clients[0].is_connected
+        assert (await client.read_live()).raw == live_buffer()
+    assert radio.clients[0].writes == [(WRITE_UUID, b'{"Cmd": ReadLive}', True)]
 
 
 async def test_public_run_cannot_bypass_mask_entry_point(radio: FakeRadio) -> None:
@@ -371,3 +378,119 @@ async def test_caught_command_cancellation_still_poisons(
     with pytest.raises(asyncio.CancelledError):
         await task
     assert not radio.clients[0].is_connected
+
+
+@pytest.mark.parametrize(
+    ("reply", "error"),
+    [
+        (b"Fail", CommandFailed),
+        (b"Success Fail", CommandFailed),
+        (bytes(65), ProtocolError),
+    ],
+)
+async def test_reply_failure_interrupts_blocked_write(
+    radio: FakeRadio, reply: bytes, error: type[ProtocolError]
+) -> None:
+    radio.block = "write"
+    client = MicroAirClient(DEVICE, max_attempts=2)
+
+    async def owner() -> None:
+        async with client.transaction():
+            await client.run(Command.READ_LIVE, timeout=10)
+
+    task = asyncio.create_task(owner())
+    await asyncio.wait_for(radio.entered.wait(), 1)
+    radio.clients[0].emit(reply)
+    # Do not release the GATT write: the failure must cancel/drain it promptly.
+    with pytest.raises(error):
+        await asyncio.wait_for(task, 0.2)
+    assert not radio.release.is_set()
+    assert radio.clients[0].write_cancelled
+    assert not radio.clients[0].is_connected
+
+
+@pytest.mark.parametrize("stage", ["connect", "disconnect"])
+async def test_cancellation_survives_cleanup_failure(
+    radio: FakeRadio, stage: str
+) -> None:
+    radio.block = stage
+    radio.error_at = stage
+    client = MicroAirClient(DEVICE, max_attempts=2)
+
+    async def owner() -> None:
+        async with client.transaction():
+            pass
+
+    task = asyncio.create_task(owner())
+    await asyncio.wait_for(radio.entered.wait(), 1)
+    task.cancel()
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    radio.release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert task.cancelled()
+    # A transport failure can leave physical state unknown, but no connection
+    # handle may be reused, and the transaction lock must always be released.
+    radio.block = None
+    radio.error_at = None
+    radio.replies = [[live_buffer(), b"Success"]]
+    async with client.transaction():
+        assert (await client.read_live()).raw == live_buffer()
+    assert len(radio.clients) == 2
+
+
+@pytest.mark.parametrize("model", [b"398ULBT", b"364ULBT", b"399BT  "])
+async def test_mask_requires_fresh_model_match(radio: FakeRadio, model: bytes) -> None:
+    fresh = bytearray(eeprom_buffer())
+    fresh[2:9] = model
+    radio.replies = [
+        [eeprom_buffer(), b"Success"],
+        [bytes(fresh), b"Success"],
+        [b"Success"],
+    ]
+    client = MicroAirClient(DEVICE, max_attempts=4)
+    async with client.transaction():
+        # An earlier matching model must not substitute for the fresh bind.
+        assert (await client.read_eeprom()).model == "398ULBT"
+        if model == b"398ULBT":
+            await client.write_startup_mask(1)
+        else:
+            with pytest.raises(ProtocolError, match="model"):
+                await client.write_startup_mask(1)
+    expected = [
+        (WRITE_UUID, b'{"Cmd": ReadEEP}', True),
+        (WRITE_UUID, b'{"Cmd": ReadEEP}', True),
+    ]
+    if model == b"398ULBT":
+        expected.append((WRITE_UUID, b'{"Cmd": SMask=01}', True))
+    assert radio.clients[0].writes == expected
+    assert len(radio.clients) == 1
+
+
+@pytest.mark.parametrize("reply", [[b"Fail"], [b"Success"]])
+async def test_mask_refused_when_eeprom_read_fails(
+    radio: FakeRadio, reply: list[bytes]
+) -> None:
+    radio.replies = [reply]
+    client = MicroAirClient(DEVICE, max_attempts=4)
+    async with client.transaction():
+        with pytest.raises(ProtocolError):
+            await client.write_startup_mask(1)
+    assert radio.clients[0].writes == [(WRITE_UUID, b'{"Cmd": ReadEEP}', True)]
+    assert not radio.clients[0].is_connected
+
+
+@pytest.mark.parametrize("timeout", [0, -1, float("nan"), float("inf")])
+async def test_invalid_timeout_keeps_transaction_usable(
+    radio: FakeRadio, timeout: float
+) -> None:
+    radio.replies = [[live_buffer(), b"Success"]]
+    client = MicroAirClient(DEVICE, max_attempts=2)
+    async with client.transaction():
+        with pytest.raises(ValueError):
+            await client.run(Command.READ_LIVE, timeout=timeout)
+        assert not radio.clients[0].writes
+        assert radio.clients[0].is_connected
+        assert (await client.read_live()).raw == live_buffer()
+    assert radio.clients[0].writes == [(WRITE_UUID, b'{"Cmd": ReadLive}', True)]

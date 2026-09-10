@@ -33,6 +33,7 @@ from .protocol import (
 SERVICE_UUID = "d973f2e0-b19e-11e2-9e96-0800200c9a66"
 NOTIFY_UUID = "d973f2e1-b19e-11e2-9e96-0800200c9a66"
 WRITE_UUID = "d973f2e2-b19e-11e2-9e96-0800200c9a66"
+CONTROL_MODELS = frozenset({"398ULBT"})
 # Provisional until the G1 live probe establishes firmware timing.
 READ_LIVE_TIMEOUT = 10.0
 SERVICE_READ_LIVE_TIMEOUT = 20.0
@@ -59,12 +60,12 @@ async def _finish_cleanup(task: asyncio.Task[None]) -> None:
     Repeated cancellation must not abandon a still-running disconnect either.
     """
     cancelled = False
-    while not task.done():
-        try:
-            await asyncio.shield(task)
-        except asyncio.CancelledError:
-            cancelled = True
     try:
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                cancelled = True
         task.result()
     finally:
         if cancelled:
@@ -238,10 +239,10 @@ class MicroAirClient:
         client = self._connected()
         if self._pending is not None:
             raise ProtocolError("A command is already in flight")
+        payload = build(cmd, arg)
+        if not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError("timeout must be finite and positive")
         try:
-            payload = build(cmd, arg)
-            if not math.isfinite(timeout) or timeout <= 0:
-                raise ValueError("timeout must be finite and positive")
             self._buffer.clear()
             self._command = cmd
             pending: asyncio.Future[bytes] = asyncio.get_running_loop().create_future()
@@ -260,12 +261,29 @@ class MicroAirClient:
                     payload
                 ):
                     raise AssertionError("Payload violates command whitelist")
-                await client.write_gatt_char(
-                    characteristic,
-                    payload,
-                    response="write" in characteristic.properties,
+                write_task = asyncio.create_task(
+                    client.write_gatt_char(
+                        characteristic,
+                        payload,
+                        response="write" in characteristic.properties,
+                    )
                 )
-                return await pending
+                try:
+                    await asyncio.wait(
+                        (write_task, pending), return_when=asyncio.FIRST_COMPLETED
+                    )
+                    # A peer failure must interrupt a stalled write. Early OK
+                    # still requires the write itself to finish by the deadline.
+                    if pending.done():
+                        pending.result()
+                    await write_task
+                    return await pending
+                finally:
+                    if not write_task.done():
+                        write_task.cancel()
+                    # Drain cancellation/transport errors without replacing the
+                    # peer failure that initiated cleanup.
+                    await asyncio.gather(write_task, return_exceptions=True)
         except TimeoutError as error:
             await self._disconnect()
             raise CommandTimeout(
@@ -286,5 +304,13 @@ class MicroAirClient:
         return parse_eeprom(await self.run(Command.READ_EEP, timeout=timeout))
 
     async def write_startup_mask(self, mask: int) -> None:
-        """The sole entry point that can emit a validated 0..0x1F startup mask."""
+        """Validate the mask and bind fresh EEPROM identity before writing.
+
+        The transaction already verified the ST triplet. Its lock covers this
+        fresh read and the write, per wiki/integration-plan.md §5.
+        """
+        build(Command.SET_STARTUP_MASK, mask)
+        eeprom = await self.read_eeprom()
+        if eeprom.model not in CONTROL_MODELS:
+            raise ProtocolError(f"Unsupported control model: {eeprom.model}")
         await self._run(Command.SET_STARTUP_MASK, mask, timeout=STARTUP_MASK_TIMEOUT)

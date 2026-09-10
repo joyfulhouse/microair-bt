@@ -58,6 +58,7 @@ class FakeBleakClient:
         )
         self.disconnected_callback: Callable[[BleakClient], None] | None = None
         self.writes: list[tuple[str, bytes, bool]] = []
+        self.write_cancelled = False
 
     async def start_notify(
         self,
@@ -73,9 +74,13 @@ class FakeBleakClient:
     ) -> None:
         assert self.is_connected
         self.writes.append((characteristic.uuid, payload, response))
-        await self.radio.pause("write")
-        for chunk in self.radio.replies.pop(0):
-            self.emit(chunk)
+        try:
+            await self.radio.pause("write")
+            for chunk in self.radio.replies.pop(0):
+                self.emit(chunk)
+        except asyncio.CancelledError:
+            self.write_cancelled = True
+            raise
 
     def emit(self, payload: bytes) -> None:
         assert self.callback is not None
