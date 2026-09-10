@@ -1,0 +1,1 @@
+"""MicroAir Bluetooth integration placeholder."""

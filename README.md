@@ -42,3 +42,36 @@ vendor app.
 ## License
 
 MIT — see [LICENSE](LICENSE). Not affiliated with MicroAir.
+
+## Development
+
+Python 3.13 and `uv`:
+
+```sh
+uv sync
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy --strict custom_components scripts tests
+uv run pytest -q
+uv run pytest --collect-only -q | tail -1
+```
+
+The standalone `custom_components.microair_bt.microair` library needs no
+Home Assistant. Tests use a fake peripheral and never access Bluetooth.
+Protocol facts and provisional framing/timeouts are in `wiki/integration-plan.md`.
+
+## Read-only probe
+
+```sh
+uv run scripts/probe.py --scan-seconds 2
+uv run scripts/probe.py --name EasyStart_XXXX
+uv run scripts/probe.py --address AA:BB:CC:DD:EE:FF --json
+```
+
+Without a selector, the probe only scans. A selected device must be heard as
+an EasyStart candidate before connection. Candidate addresses are shown in
+full; other addresses retain only their first three bytes. A selected probe
+prints the GATT profile, MTU, every notification (hex, repr, length, timing),
+and decoded EEPROM/live data. `--json` emits one document. Only the two read
+requests are sent; the probe never changes settings. Close the OEM app first.
+Real-device framing, write properties, and decoded values await G1 evidence.
