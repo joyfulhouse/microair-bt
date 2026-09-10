@@ -41,7 +41,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: MicroAirConfigEntry) ->
         entry, [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.SWITCH]
     ):
         return False
-    await entry.runtime_data.async_shutdown()
     if not any(
         other.entry_id != entry.entry_id and other.state == ConfigEntryState.LOADED
         for other in hass.config_entries.async_entries(DOMAIN)
