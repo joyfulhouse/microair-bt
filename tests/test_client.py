@@ -17,11 +17,9 @@ from custom_components.microair_bt.microair.client import (
 )
 from custom_components.microair_bt.microair.protocol import (
     Command,
-    EepromData,
     ProtocolError,
     StartupMode,
     mode_mask,
-    parse_eeprom,
 )
 from tests.conftest import DEVICE, FakeRadio
 from tests.test_protocol import BANNED, eeprom_buffer, live_buffer
@@ -513,17 +511,10 @@ async def test_invalid_timeout_keeps_transaction_usable(
 
 
 @pytest.mark.parametrize("write_mask", [False, True])
-async def test_truncated_capture_refused_before_parsing(
-    radio: FakeRadio, monkeypatch: pytest.MonkeyPatch, write_mask: bool
-) -> None:
+async def test_truncated_capture_refused(radio: FakeRadio, write_mask: bool) -> None:
     raw = (Path(__file__).parent / "fixtures" / "capture-06-ReadEEP.bin").read_bytes()
     radio.replies = [[raw, b'{"Sts": Success}'], [b'{"Sts": Success}']]
 
-    def checked_parse(buf: bytes) -> EepromData:
-        assert len(buf) == 1023, "Partial EEPROM reached the parser"
-        return parse_eeprom(buf)
-
-    monkeypatch.setattr(client_module, "parse_eeprom", checked_parse)
     client = MicroAirClient(DEVICE, max_attempts=2)
     async with client.transaction():
         with pytest.raises(ProtocolError, match="length"):

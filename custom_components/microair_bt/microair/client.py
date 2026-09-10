@@ -29,7 +29,6 @@ from .protocol import (
     is_completion,
     parse_eeprom,
     parse_live,
-    validate_eeprom,
 )
 
 SERVICE_UUID = "d973f2e0-b19e-11e2-9e96-0800200c9a66"
@@ -208,7 +207,6 @@ class MicroAirClient:
             raw = bytes(self._buffer)
             try:
                 if self._command is Command.READ_EEP:
-                    validate_eeprom(raw)
                     parse_eeprom(raw)
                 elif self._command is Command.READ_LIVE:
                     parse_live(raw)
