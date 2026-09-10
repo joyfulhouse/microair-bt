@@ -1,0 +1,658 @@
+{
+  "candidates": {},
+  "criteria": {
+    "manufacturer_pattern": null,
+    "name_contains": [
+      "EasyStart",
+      "MicroAir"
+    ],
+    "name_prefix": "ES",
+    "service_uuid": "d973f2e0-b19e-11e2-9e96-0800200c9a66"
+  },
+  "esphome_registry_devices": [
+    {
+      "config_entries": [
+        "01KXHAJZHK41A2FJ6HXEJWEKYA"
+      ],
+      "config_entry_titles": [
+        "Master Bedroom RF Bridge"
+      ],
+      "connections": [
+        [
+          "mac",
+          "c8:2b:96:ee:1d:ae"
+        ]
+      ],
+      "id": "87f7f4e99ff8fd494e2ded7cc4601f80",
+      "identifiers": [],
+      "manufacturer": "Espressif",
+      "model": "esp01_1m",
+      "name": "Master Bedroom RF Bridge"
+    },
+    {
+      "config_entries": [
+        "1a930012098d27ada069c5643b6ca8af"
+      ],
+      "config_entry_titles": [
+        "Alarm System Primary"
+      ],
+      "connections": [
+        [
+          "mac",
+          "80:64:6f:e9:c2:40"
+        ]
+      ],
+      "id": "49bfd7b85c5b4e28cad586ea697f58b6",
+      "identifiers": [],
+      "manufacturer": "Espressif",
+      "model": "wt32-eth01",
+      "name": "Alarm System Primary"
+    },
+    {
+      "config_entries": [
+        "9ae20bd6885d92fd1484322d1a540be7"
+      ],
+      "config_entry_titles": [
+        "RF Bridge Starry's Office"
+      ],
+      "connections": [
+        [
+          "mac",
+          "c8:2b:96:ed:ef:36"
+        ]
+      ],
+      "id": "e6abc431af91a6297066e1e888beb0db",
+      "identifiers": [],
+      "manufacturer": "Espressif",
+      "model": "esp01_1m",
+      "name": "Starry's Office RF Bridge"
+    },
+    {
+      "config_entries": [
+        "20fc6984dc990ae15574caa6c0e78ba7"
+      ],
+      "config_entry_titles": [
+        "RF Bridge Office"
+      ],
+      "connections": [
+        [
+          "mac",
+          "c8:2b:96:ee:28:19"
+        ]
+      ],
+      "id": "2bac8489d5261acf05ca3f9c4cc0a9cf",
+      "identifiers": [],
+      "manufacturer": "Espressif",
+      "model": "esp01_1m",
+      "name": "Office RF Bridge"
+    },
+    {
+      "config_entries": [
+        "2e4ede72c0f7062f1693292008f0f194"
+      ],
+      "config_entry_titles": [
+        "Alarm System ADU"
+      ],
+      "connections": [
+        [
+          "mac",
+          "80:64:6f:e9:ce:f8"
+        ]
+      ],
+      "id": "61b3cea5f6b3c69cf7b6df3d60a58bde",
+      "identifiers": [],
+      "manufacturer": "Espressif",
+      "model": "wt32-eth01",
+      "name": "Alarm System ADU"
+    },
+    {
+      "config_entries": [
+        "d020a8f3d05996c0671648ce355a8cbf"
+      ],
+      "config_entry_titles": [
+        "Alarm System Shed"
+      ],
+      "connections": [
+        [
+          "mac",
+          "80:64:6f:e9:be:ec"
+        ]
+      ],
+      "id": "4693cd5fd957acf92fd0b99fcbb6fb2e",
+      "identifiers": [],
+      "manufacturer": "Espressif",
+      "model": "wt32-eth01",
+      "name": "Alarm System Shed"
+    },
+    {
+      "config_entries": [
+        "8a1a4cc0daf2fb6a3e465ba0de9759f8"
+      ],
+      "config_entry_titles": [
+        "Ring Retrofit Relay"
+      ],
+      "connections": [
+        [
+          "mac",
+          "80:64:6f:e9:d3:68"
+        ]
+      ],
+      "id": "5602b461ff36dbc8dc6a02ed77ba2a71",
+      "identifiers": [],
+      "manufacturer": "Espressif",
+      "model": "wt32-eth01",
+      "name": "Ring Retrofit Relay"
+    },
+    {
+      "config_entries": [
+        "f7585df957b235837511b9f8e3c94b5d"
+      ],
+      "config_entry_titles": [
+        "RF Bridge Sunroom"
+      ],
+      "connections": [
+        [
+          "mac",
+          "c8:2b:96:ee:18:cd"
+        ]
+      ],
+      "id": "270a1f9bb32d27c50baaaf1fcedf24a5",
+      "identifiers": [],
+      "manufacturer": "Espressif",
+      "model": "esp01_1m",
+      "name": "Sunroom RF Bridge"
+    },
+    {
+      "config_entries": [
+        "a122a02cd9fe13beaf3f6a53e8c7304f"
+      ],
+      "config_entry_titles": [
+        "RF Bridge Kaelyn"
+      ],
+      "connections": [
+        [
+          "mac",
+          "c8:2b:96:ed:ef:37"
+        ]
+      ],
+      "id": "eb9a822a745a880dec71261dfbf0e01a",
+      "identifiers": [],
+      "manufacturer": "Espressif",
+      "model": "esp01_1m",
+      "name": "Kaelyn RF Bridge"
+    },
+    {
+      "config_entries": [
+        "01JQAKCPQJYKCTPRJHV1AE0QNJ"
+      ],
+      "config_entry_titles": [
+        "Downstairs Attic Fan"
+      ],
+      "connections": [
+        [
+          "mac",
+          "08:b6:1f:99:52:68"
+        ]
+      ],
+      "id": "ae6ba51fc297a68ee2e29ac7ecc7b1c5",
+      "identifiers": [],
+      "manufacturer": "Espressif",
+      "model": "esp32dev",
+      "name": "Downstairs Attic Fan"
+    },
+    {
+      "config_entries": [
+        "01JQAM78KXS84THMTHK2AWY6VK"
+      ],
+      "config_entry_titles": [
+        "Upstairs Attic Fan"
+      ],
+      "connections": [
+        [
+          "mac",
+          "34:98:7a:9f:e0:dc"
+        ]
+      ],
+      "id": "7f1bd1e01c5719f374c755c6fcaa618a",
+      "identifiers": [],
+      "manufacturer": "Espressif",
+      "model": "esp32dev",
+      "name": "Upstairs Attic Fan"
+    },
+    {
+      "config_entries": [
+        "01KXHAJVW0H8Q4CBM2YPGSXYAA"
+      ],
+      "config_entry_titles": [
+        "Living Room RF Bridge"
+      ],
+      "connections": [
+        [
+          "mac",
+          "c8:2b:96:ee:2b:ba"
+        ]
+      ],
+      "id": "3d1f699bb2d183f81fec7d79767d4cee",
+      "identifiers": [],
+      "manufacturer": "Espressif",
+      "model": "esp01_1m",
+      "name": "Living Room RF Bridge"
+    },
+    {
+      "config_entries": [
+        "01KXSPT0FGF68MF0D7116C3RC5"
+      ],
+      "config_entry_titles": [
+        "QuietCool Downstairs RF Controller"
+      ],
+      "connections": [
+        [
+          "mac",
+          "f0:24:f9:ae:f2:c0"
+        ]
+      ],
+      "id": "615bdfc460bab24d70401ea7e3844c88",
+      "identifiers": [],
+      "manufacturer": "Espressif",
+      "model": "ttgo-lora32-v21",
+      "name": "QuietCool Downstairs"
+    },
+    {
+      "config_entries": [
+        "01KXV4PDSM2WTF25JRXBW964V1"
+      ],
+      "config_entry_titles": [
+        "QuietCool Upstairs RF Controller"
+      ],
+      "connections": [
+        [
+          "mac",
+          "f0:24:f9:aa:c0:18"
+        ]
+      ],
+      "id": "9818102c09d55afbc9e1d0e0bb4350ea",
+      "identifiers": [],
+      "manufacturer": "Espressif",
+      "model": "ttgo-lora32-v21",
+      "name": "QuietCool Upstairs"
+    },
+    {
+      "config_entries": [
+        "01KXX0SGRC1MS7XGF4ZRPGFYKQ"
+      ],
+      "config_entry_titles": [
+        "Kitchen RF Bridge"
+      ],
+      "connections": [
+        [
+          "mac",
+          "2c:f4:32:ef:49:06"
+        ]
+      ],
+      "id": "4bfb79ee16d8d23cd343ec099c5c7840",
+      "identifiers": [],
+      "manufacturer": "Espressif",
+      "model": "esp01_1m",
+      "name": "Kitchen RF Bridge"
+    },
+    {
+      "config_entries": [
+        "01KY2N0AVRVJ508FF2X7KW16PR"
+      ],
+      "config_entry_titles": [
+        "ADU Panel"
+      ],
+      "connections": [
+        [
+          "mac",
+          "30:ed:a0:e1:8e:1f"
+        ]
+      ],
+      "id": "b073af36b3afc893adbe00ee763a86d6",
+      "identifiers": [],
+      "manufacturer": "Espressif",
+      "model": "esp32-p4-evboard",
+      "name": "ADU Panel"
+    }
+  ],
+  "kaelyns_bedroom_neighbours": {
+    "04:0E:9D:xx:xx:xx": {
+      "candidate": false,
+      "name": "PRP1-RD_2FF9",
+      "service_uuids": [
+        "0000af30-0000-1000-8000-00805f9b34fb"
+      ],
+      "sources": {
+        "70:04:1D:1F:3B:8A": {
+          "best_rssi": -70,
+          "count": 1,
+          "last_rssi": -70
+        }
+      }
+    },
+    "0B:DD:C4:xx:xx:xx": {
+      "candidate": false,
+      "name": "0B:DD:C4:xx:xx:xx",
+      "service_uuids": [],
+      "sources": {
+        "70:04:1D:1F:3B:8A": {
+          "best_rssi": -95,
+          "count": 1,
+          "last_rssi": -95
+        }
+      }
+    },
+    "44:3E:8A:xx:xx:xx": {
+      "candidate": false,
+      "name": "44:3E:8A:xx:xx:xx",
+      "service_uuids": [],
+      "sources": {
+        "70:04:1D:1F:3B:8A": {
+          "best_rssi": -97,
+          "count": 1,
+          "last_rssi": -97
+        }
+      }
+    },
+    "50:E0:58:xx:xx:xx": {
+      "candidate": false,
+      "name": "50:E0:58:xx:xx:xx",
+      "service_uuids": [
+        "0000fea0-0000-1000-8000-00805f9b34fb"
+      ],
+      "sources": {
+        "70:04:1D:1F:3B:8A": {
+          "best_rssi": -94,
+          "count": 1,
+          "last_rssi": -94
+        }
+      }
+    },
+    "55:5C:90:xx:xx:xx": {
+      "candidate": false,
+      "name": "55:5C:90:xx:xx:xx",
+      "service_uuids": [
+        "00003456-0000-1000-8000-00805f9b34fb"
+      ],
+      "sources": {
+        "70:04:1D:1F:3B:8A": {
+          "best_rssi": -82,
+          "count": 1,
+          "last_rssi": -82
+        }
+      }
+    },
+    "60:85:B7:xx:xx:xx": {
+      "candidate": false,
+      "name": "60:85:B7:xx:xx:xx",
+      "service_uuids": [
+        "0000fe9f-0000-1000-8000-00805f9b34fb"
+      ],
+      "sources": {
+        "70:04:1D:1F:3B:8A": {
+          "best_rssi": -84,
+          "count": 1,
+          "last_rssi": -84
+        }
+      }
+    },
+    "6E:A4:74:xx:xx:xx": {
+      "candidate": false,
+      "name": "6E:A4:74:xx:xx:xx",
+      "service_uuids": [],
+      "sources": {
+        "70:04:1D:1F:3B:8A": {
+          "best_rssi": -70,
+          "count": 1,
+          "last_rssi": -70
+        }
+      }
+    },
+    "73:8E:C0:xx:xx:xx": {
+      "candidate": false,
+      "name": "73:8E:C0:xx:xx:xx",
+      "service_uuids": [],
+      "sources": {
+        "70:04:1D:1F:3B:8A": {
+          "best_rssi": -85,
+          "count": 1,
+          "last_rssi": -85
+        }
+      }
+    },
+    "7B:4F:D5:xx:xx:xx": {
+      "candidate": false,
+      "name": "7B:4F:D5:xx:xx:xx",
+      "service_uuids": [
+        "0000fe9f-0000-1000-8000-00805f9b34fb"
+      ],
+      "sources": {
+        "70:04:1D:1F:3B:8A": {
+          "best_rssi": -72,
+          "count": 1,
+          "last_rssi": -72
+        }
+      }
+    },
+    "C1:9A:5E:xx:xx:xx": {
+      "candidate": false,
+      "name": "Govee_H6093_9E58",
+      "service_uuids": [],
+      "sources": {
+        "70:04:1D:1F:3B:8A": {
+          "best_rssi": -47,
+          "count": 1,
+          "last_rssi": -47
+        }
+      }
+    },
+    "E8:06:90:xx:xx:xx": {
+      "candidate": false,
+      "name": "E8:06:90:xx:xx:xx",
+      "service_uuids": [],
+      "sources": {
+        "70:04:1D:1F:3B:8A": {
+          "best_rssi": -35,
+          "count": 1,
+          "last_rssi": -35
+        }
+      }
+    },
+    "FC:F5:C4:xx:xx:xx": {
+      "candidate": false,
+      "name": "SPU-00009694-V002",
+      "service_uuids": [
+        "0000ffff-0000-1000-8000-00805f9b34fb"
+      ],
+      "sources": {
+        "70:04:1D:1F:3B:8A": {
+          "best_rssi": -70,
+          "count": 1,
+          "last_rssi": -70
+        }
+      }
+    },
+    "FE:0C:FE:xx:xx:xx": {
+      "candidate": false,
+      "name": "FE:0C:FE:xx:xx:xx",
+      "service_uuids": [],
+      "sources": {
+        "70:04:1D:1F:3B:8A": {
+          "best_rssi": -91,
+          "count": 1,
+          "last_rssi": -91
+        }
+      }
+    }
+  },
+  "kaelyns_bedroom_sources": [
+    "70:04:1D:1F:3B:8A"
+  ],
+  "proxy_map": {
+    "08:B6:1F:99:52:68": "Downstairs Attic Fan",
+    "2C:F4:32:EF:49:06": "Kitchen RF Bridge",
+    "30:ED:A0:E1:8E:1F": "ADU Panel",
+    "34:98:7A:9F:E0:DC": "Upstairs Attic Fan",
+    "70:04:1D:1F:27:B2": "aiosense-master-bedroom (70:04:1D:1F:27:B2)",
+    "70:04:1D:1F:31:DE": "aiosense-master-bathroom (70:04:1D:1F:31:DE)",
+    "70:04:1D:1F:36:7A": "aiosense-starrys-office (70:04:1D:1F:36:7A)",
+    "70:04:1D:1F:3B:8A": "aiosense-kaelyns-bedroom (70:04:1D:1F:3B:8A)",
+    "70:04:1D:1F:42:32": "aiosense-guest-bathroom (70:04:1D:1F:42:32)",
+    "70:04:1D:1F:4C:06": "aiosense-adu-main (70:04:1D:1F:4C:06)",
+    "70:04:1D:1F:4D:C6": "aiosense-officedesk (70:04:1D:1F:4D:C6)",
+    "70:04:1D:22:61:A2": "aiosense-kitchen (70:04:1D:22:61:A2)",
+    "70:04:1D:22:6B:26": "aiosense-shed (70:04:1D:22:6B:26)",
+    "70:04:1D:22:72:2A": "aiosense-living-room (70:04:1D:22:72:2A)",
+    "70:04:1D:22:77:DA": "aiosense-adu-bedroom (70:04:1D:22:77:DA)",
+    "70:04:1D:22:90:52": "aiosense-office-tv (70:04:1D:22:90:52)",
+    "70:04:1D:22:94:2A": "aiosense-living-room-tv (70:04:1D:22:94:2A)",
+    "70:04:1D:22:98:52": "aiosense-dining-room (70:04:1D:22:98:52)",
+    "70:04:1D:22:9B:62": "aiosense-office-bathroom (70:04:1D:22:9B:62)",
+    "80:64:6F:E9:BE:EC": "Alarm System Shed",
+    "80:64:6F:E9:C2:40": "Alarm System Primary",
+    "80:64:6F:E9:CE:F8": "Alarm System ADU",
+    "80:64:6F:E9:D3:68": "Ring Retrofit Relay",
+    "C8:2B:96:ED:EF:36": "Starry's Office RF Bridge",
+    "C8:2B:96:ED:EF:37": "Kaelyn RF Bridge",
+    "C8:2B:96:EE:18:CD": "Sunroom RF Bridge",
+    "C8:2B:96:EE:1D:AE": "Master Bedroom RF Bridge",
+    "C8:2B:96:EE:28:19": "Office RF Bridge",
+    "C8:2B:96:EE:2B:BA": "Living Room RF Bridge",
+    "F0:24:F9:AA:C0:18": "QuietCool Upstairs",
+    "F0:24:F9:AE:F2:C0": "QuietCool Downstairs"
+  },
+  "scan": {
+    "candidate_count": 0,
+    "distinct_devices": 219,
+    "seconds": 180.0,
+    "total_events": 246
+  },
+  "scanner_details": [
+    {
+      "add": [
+        {
+          "adapter": "aiosense-officedesk",
+          "connectable": true,
+          "name": "aiosense-officedesk (70:04:1D:1F:4D:C6)",
+          "scanner_type": "remote",
+          "source": "70:04:1D:1F:4D:C6"
+        },
+        {
+          "adapter": "aiosense-kaelyns-bedroom",
+          "connectable": true,
+          "name": "aiosense-kaelyns-bedroom (70:04:1D:1F:3B:8A)",
+          "scanner_type": "remote",
+          "source": "70:04:1D:1F:3B:8A"
+        },
+        {
+          "adapter": "aiosense-living-room",
+          "connectable": true,
+          "name": "aiosense-living-room (70:04:1D:22:72:2A)",
+          "scanner_type": "remote",
+          "source": "70:04:1D:22:72:2A"
+        },
+        {
+          "adapter": "aiosense-dining-room",
+          "connectable": true,
+          "name": "aiosense-dining-room (70:04:1D:22:98:52)",
+          "scanner_type": "remote",
+          "source": "70:04:1D:22:98:52"
+        },
+        {
+          "adapter": "aiosense-shed",
+          "connectable": true,
+          "name": "aiosense-shed (70:04:1D:22:6B:26)",
+          "scanner_type": "remote",
+          "source": "70:04:1D:22:6B:26"
+        },
+        {
+          "adapter": "aiosense-master-bathroom",
+          "connectable": true,
+          "name": "aiosense-master-bathroom (70:04:1D:1F:31:DE)",
+          "scanner_type": "remote",
+          "source": "70:04:1D:1F:31:DE"
+        },
+        {
+          "adapter": "aiosense-kitchen",
+          "connectable": true,
+          "name": "aiosense-kitchen (70:04:1D:22:61:A2)",
+          "scanner_type": "remote",
+          "source": "70:04:1D:22:61:A2"
+        },
+        {
+          "adapter": "aiosense-office-tv",
+          "connectable": true,
+          "name": "aiosense-office-tv (70:04:1D:22:90:52)",
+          "scanner_type": "remote",
+          "source": "70:04:1D:22:90:52"
+        },
+        {
+          "adapter": "aiosense-guest-bathroom",
+          "connectable": true,
+          "name": "aiosense-guest-bathroom (70:04:1D:1F:42:32)",
+          "scanner_type": "remote",
+          "source": "70:04:1D:1F:42:32"
+        },
+        {
+          "adapter": "aiosense-adu-bedroom",
+          "connectable": true,
+          "name": "aiosense-adu-bedroom (70:04:1D:22:77:DA)",
+          "scanner_type": "remote",
+          "source": "70:04:1D:22:77:DA"
+        },
+        {
+          "adapter": "aiosense-adu-main",
+          "connectable": true,
+          "name": "aiosense-adu-main (70:04:1D:1F:4C:06)",
+          "scanner_type": "remote",
+          "source": "70:04:1D:1F:4C:06"
+        },
+        {
+          "adapter": "aiosense-master-bedroom",
+          "connectable": true,
+          "name": "aiosense-master-bedroom (70:04:1D:1F:27:B2)",
+          "scanner_type": "remote",
+          "source": "70:04:1D:1F:27:B2"
+        },
+        {
+          "adapter": "aiosense-starrys-office",
+          "connectable": true,
+          "name": "aiosense-starrys-office (70:04:1D:1F:36:7A)",
+          "scanner_type": "remote",
+          "source": "70:04:1D:1F:36:7A"
+        },
+        {
+          "adapter": "aiosense-office-bathroom",
+          "connectable": true,
+          "name": "aiosense-office-bathroom (70:04:1D:22:9B:62)",
+          "scanner_type": "remote",
+          "source": "70:04:1D:22:9B:62"
+        },
+        {
+          "adapter": "aiosense-living-room-tv",
+          "connectable": true,
+          "name": "aiosense-living-room-tv (70:04:1D:22:94:2A)",
+          "scanner_type": "remote",
+          "source": "70:04:1D:22:94:2A"
+        }
+      ]
+    }
+  ],
+  "source_event_counts": {
+    "70:04:1D:1F:27:B2": 19,
+    "70:04:1D:1F:31:DE": 25,
+    "70:04:1D:1F:36:7A": 2,
+    "70:04:1D:1F:3B:8A": 13,
+    "70:04:1D:1F:42:32": 3,
+    "70:04:1D:1F:4C:06": 24,
+    "70:04:1D:1F:4D:C6": 38,
+    "70:04:1D:22:61:A2": 24,
+    "70:04:1D:22:6B:26": 28,
+    "70:04:1D:22:72:2A": 21,
+    "70:04:1D:22:77:DA": 4,
+    "70:04:1D:22:90:52": 11,
+    "70:04:1D:22:94:2A": 9,
+    "70:04:1D:22:98:52": 23,
+    "70:04:1D:22:9B:62": 2
+  }
+}
