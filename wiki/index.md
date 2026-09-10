@@ -16,8 +16,8 @@ from HA.
 | BLE protocol reverse-engineered from source | ✅ done — two independent reads agree ([ble-protocol](ble-protocol.md)) |
 | Public documentation / prior art collected | ✅ done — OEM relearn procedure + community ESPHome read path ([device-easystart-flex](device-easystart-flex.md)) |
 | Device located on an HA Bluetooth proxy | ❌ **not heard** in a 270 s passive scan — likely unpowered / A/C idle ([ha-proxy-coverage](ha-proxy-coverage.md)) |
-| Specification for the integration | ✅ drafted — [integration-plan](integration-plan.md) (pending /debate) |
-| HA custom integration | ⏳ pending spec approval |
+| Specification for the integration | ✅ v1.1 — [integration-plan](integration-plan.md); three-vendor /debate REVISE×3 folded in (`docs/claude/research/debate-spec-synthesis.md`); awaiting plan-gate ruling |
+| HA custom integration | ⏳ PR-1 protocol lib + probe, then PR-2 component — pending plan gate |
 | Live validation on real device | ⏳ blocked on hearing the unit |
 
 ## The one-paragraph answer
