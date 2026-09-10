@@ -76,8 +76,8 @@ async def test_selected_probe_reads_and_records_notifications(
     fake_scan(monkeypatch, {DEVICE.address: (DEVICE, advertisement("EasyStart_TEST"))})
     raw = eeprom_buffer()
     radio.replies = [
-        [raw[i : i + 20] for i in range(0, 1100, 20)] + [b"Success\r\n"],
-        [live_buffer(), b"Success\0"],
+        [raw[i : i + 20] for i in range(0, 1100, 20)] + [b'{"Sts": Success}\r\n'],
+        [live_buffer(), b'{"Sts": Success}\0'],
     ]
     assert (
         await probe.probe(
@@ -105,9 +105,9 @@ async def test_selected_probe_reads_and_records_notifications(
         assert report["live"]["status"] == "SHORT_CYCLE_DELAY"
         assert len(report["notifications"]) == 58
         notification = report["notifications"][-1]
-        assert notification["hex"] == b"Success\0".hex()
-        assert notification["repr"] == repr(b"Success\0")
-        assert notification["len"] == 8
+        assert notification["hex"] == b'{"Sts": Success}\0'.hex()
+        assert notification["repr"] == repr(b'{"Sts": Success}\0')
+        assert notification["len"] == 17
         assert notification["elapsed_ms"] >= 0
         characteristic = report["services"][0]["characteristics"][1]
         assert characteristic["properties"] == ["write", "write-without-response"]
@@ -123,10 +123,10 @@ async def test_selected_probe_reads_and_records_notifications(
             "mtu_size=23",
             "properties",
             "descriptors",
-            "len=8",
+            "len=17",
             "elapsed_ms=",
-            b"Success\0".hex(),
-            repr(b"Success\0"),
+            b'{"Sts": Success}\0'.hex(),
+            repr(b'{"Sts": Success}\0'),
         ):
             assert value in output
 
@@ -182,11 +182,11 @@ async def test_transport_error_is_one_json_document(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     fake_scan(monkeypatch, {DEVICE.address: (DEVICE, advertisement(DEVICE.name))})
-    radio.replies = [[b"Fail"]]
+    radio.replies = [[b'{"Sts": Fail}']]
     assert await probe.probe(name=DEVICE.name, json_output=True, scan_seconds=2) == 1
     report = json.loads(capsys.readouterr().out)
-    assert "error" in report
-    assert report["notifications"][0]["repr"] == "b'Fail'"
+    assert report["error"] == "CommandFailed: Command completion: fail"
+    assert report["notifications"][0]["repr"] == repr(b'{"Sts": Fail}')
     assert not radio.clients[0].is_connected
 
 

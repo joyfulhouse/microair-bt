@@ -25,9 +25,11 @@ from .protocol import (
     LiveData,
     ProtocolError,
     build,
+    has_unsupported_bits,
     is_completion,
     parse_eeprom,
     parse_live,
+    validate_eeprom,
 )
 
 SERVICE_UUID = "d973f2e0-b19e-11e2-9e96-0800200c9a66"
@@ -206,6 +208,7 @@ class MicroAirClient:
             raw = bytes(self._buffer)
             try:
                 if self._command is Command.READ_EEP:
+                    validate_eeprom(raw)
                     parse_eeprom(raw)
                 elif self._command is Command.READ_LIVE:
                     parse_live(raw)
@@ -304,13 +307,18 @@ class MicroAirClient:
         return parse_eeprom(await self.run(Command.READ_EEP, timeout=timeout))
 
     async def write_startup_mask(self, mask: int) -> None:
-        """Validate the mask and bind fresh EEPROM identity before writing.
+        """Validate the mask and preserve bits 2–4 from fresh EEPROM data.
 
         The transaction already verified the ST triplet. Its lock covers this
-        fresh read and the write, per wiki/integration-plan.md §5.
+        fresh read and the write. Only the requested mode bits (0–1) are used.
         """
         build(Command.SET_STARTUP_MASK, mask)
         eeprom = await self.read_eeprom()
         if eeprom.model not in CONTROL_MODELS:
             raise ProtocolError(f"Unsupported control model: {eeprom.model}")
+        if has_unsupported_bits(eeprom.startup_mask):
+            raise ProtocolError(
+                f"Unsupported original startup mask: 0x{eeprom.startup_mask:02X}"
+            )
+        mask = (eeprom.startup_mask & 0x1C) | (mask & 0x03)
         await self._run(Command.SET_STARTUP_MASK, mask, timeout=STARTUP_MASK_TIMEOUT)

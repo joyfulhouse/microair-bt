@@ -1,6 +1,7 @@
 """Wire fixtures from wiki/ble-protocol.md and wiki/available-data.md."""
 
 from dataclasses import FrozenInstanceError
+from pathlib import Path
 from typing import cast
 
 import pytest
@@ -111,7 +112,7 @@ def test_mode_mask(current: int, mode: StartupMode, expected: int) -> None:
 
 @pytest.mark.parametrize("mask", range(256))
 def test_unsupported_bits(mask: int) -> None:
-    assert has_unsupported_bits(mask) is (mask >= 16)
+    assert has_unsupported_bits(mask) is (mask >= 32)
 
 
 @pytest.mark.parametrize("bad", [-1, 256, True, "00"])
@@ -127,27 +128,35 @@ def test_invalid_mode() -> None:
         mode_mask(0, cast(StartupMode, "relearn"))
 
 
-@pytest.mark.parametrize(
-    ("value", "expected"),
-    [
-        (b"Success", Completion.OK),
-        (b"Success\r\n", Completion.OK),
-        (b"Success\0", Completion.OK),
-        (b"Success \t\v\f\r\n\0", Completion.OK),
-        (b"Fail\r\n", Completion.FAIL),
-        (b"Success Fail", Completion.CONFLICT),
-        (b"Fail then Success", Completion.CONFLICT),
-        (b"\x01Success" + b"\x02" * 12, None),
-        (b"Success" + b"x" * 93, None),
-        (b"Success\x80", None),
-        (b"x" * 57 + b"Success", Completion.OK),
-        (b"", None),
-        (b"success", None),
-        (b"Success\0x", None),
-    ],
-)
-def test_completion(value: bytes, expected: Completion | None) -> None:
-    assert is_completion(value) is expected
+@pytest.mark.parametrize("token", [b"Success", b"Fail"])
+def test_completion(token: bytes) -> None:
+    envelope = b'{"Sts": ' + token + b"}"
+    expected = Completion.OK if token == b"Success" else Completion.FAIL
+    for suffix in (b"", b"\r", b"\n", b"\0", b"\r\n\0"):
+        assert is_completion(envelope + suffix) is expected
+    for invalid in (
+        token,
+        b"prefix " + envelope,
+        envelope + b" trailing",
+        b'{"Other": ' + token + b"}",
+        b'{"Sts": "' + token + b'"}',
+        b'{"Sts": ' + token.lower() + b"}",
+        b'{"Sts": ' + token + b"Extra}",
+        b'{"Sts":Success}',
+        b'{"Sts": Success Fail}',
+        b"Success Fail",
+        b"Fail then Success",
+        b"\x01" + envelope,
+        envelope + b"\x80",
+        envelope + b"\0x",
+        envelope + b" ",
+        envelope + b"\t",
+        envelope + b"\v",
+        envelope + b"\f",
+        b"x" * 57 + b"Success",
+        b"",
+    ):
+        assert is_completion(invalid) is None, invalid
 
 
 def live_buffer(length: int = 20) -> bytes:
@@ -158,6 +167,7 @@ def live_buffer(length: int = 20) -> bytes:
 
 def eeprom_buffer(length: int = 1100) -> bytes:
     buf = bytearray(length)
+    buf[:2] = (length - 2).to_bytes(2, "little")
     buf[2:9] = b"398ULBT"
     buf[10] = 29
     buf[906:909] = bytes([0x15, 0x7F, 5])
@@ -224,3 +234,28 @@ def test_eeprom_rejects_nonprintable_model(bad: bytes) -> None:
     buf[2:9] = bad
     with pytest.raises(ProtocolError):
         parse_eeprom(bytes(buf))
+
+
+def test_eeprom_golden_captures() -> None:
+    fixtures = Path(__file__).parent / "fixtures"
+    truncated = (fixtures / "capture-06-ReadEEP.bin").read_bytes()
+    complete = (fixtures / "capture-08-ReadEEP.bin").read_bytes()
+    assert len(truncated) == 923
+    assert len(complete) == 1023
+    assert truncated[:2] == complete[:2] == b"\xfd\x03"
+    with pytest.raises(ProtocolError, match="length"):
+        parse_eeprom(truncated)
+    data = parse_eeprom(complete)
+    assert data.startup_mask == 0x00
+    assert data.model == "398ULBT"
+    assert data.raw == complete
+
+
+@pytest.mark.parametrize("length", [909, 923, 1023, 1100])
+def test_eeprom_requires_exact_length_prefix(length: int) -> None:
+    raw = eeprom_buffer(length)
+    assert parse_eeprom(raw).raw == raw
+    for declared_length in (0, length - 3, length - 1, length, 65535):
+        malformed = declared_length.to_bytes(2, "little") + raw[2:]
+        with pytest.raises(ProtocolError, match="length"):
+            parse_eeprom(malformed)
