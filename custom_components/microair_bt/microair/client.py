@@ -25,6 +25,7 @@ from .protocol import (
     LiveData,
     ProtocolError,
     build,
+    has_unsupported_bits,
     is_completion,
     parse_eeprom,
     parse_live,
@@ -45,7 +46,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class CommandFailed(ProtocolError):
-    """The device reported failure (including conflicting completion tokens)."""
+    """The device reported failure in an exact completion envelope."""
 
 
 class CommandTimeout(TimeoutError):
@@ -200,7 +201,7 @@ class MicroAirClient:
         if pending is None or pending.done():
             return
         completion = is_completion(data)
-        if completion in (Completion.FAIL, Completion.CONFLICT):
+        if completion is Completion.FAIL:
             self._fail(CommandFailed(f"Command completion: {completion.value}"))
         elif completion is Completion.OK:
             raw = bytes(self._buffer)
@@ -304,13 +305,19 @@ class MicroAirClient:
         return parse_eeprom(await self.run(Command.READ_EEP, timeout=timeout))
 
     async def write_startup_mask(self, mask: int) -> None:
-        """Validate the mask and bind fresh EEPROM identity before writing.
+        """Accept only modes 0, 1 or 2 and preserve fresh EEPROM bits 2–4.
 
         The transaction already verified the ST triplet. Its lock covers this
-        fresh read and the write, per wiki/integration-plan.md §5.
+        fresh read and the write. Reject invalid modes before any device I/O.
         """
-        build(Command.SET_STARTUP_MASK, mask)
+        if type(mask) is not int or mask not in (0x00, 0x01, 0x02):
+            raise ValueError("Startup mode must be 0 (normal), 1 (relearn) or 2 (ramp)")
         eeprom = await self.read_eeprom()
         if eeprom.model not in CONTROL_MODELS:
             raise ProtocolError(f"Unsupported control model: {eeprom.model}")
+        if has_unsupported_bits(eeprom.startup_mask):
+            raise ProtocolError(
+                f"Unsupported original startup mask: 0x{eeprom.startup_mask:02X}"
+            )
+        mask = (eeprom.startup_mask & 0x1C) | mask
         await self._run(Command.SET_STARTUP_MASK, mask, timeout=STARTUP_MASK_TIMEOUT)

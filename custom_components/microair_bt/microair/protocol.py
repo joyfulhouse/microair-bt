@@ -1,7 +1,7 @@
 """EasyStart wire format from wiki/ble-protocol.md and wiki/available-data.md.
 
-Buffer offsets include the two opaque prefix bytes. No peripheral identity or
-checksum can be inferred from those bytes; all incoming lengths are bounded.
+Buffer offsets include the two prefix bytes. For ReadEEP these encode the
+remaining payload length as a little-endian uint16; incoming lengths are bounded.
 """
 
 from dataclasses import dataclass
@@ -100,9 +100,9 @@ def mode_mask(current: int, mode: StartupMode) -> int:
 
 
 def has_unsupported_bits(mask: int) -> bool:
-    """Flag hidden SuperLearn/unknown bits for the future control guard."""
+    """Reject bits 5–7 in the original EEPROM mask; bit 4 is preserved."""
     _validate_mask(mask, 0xFF)
-    return bool(mask & 0xF0)
+    return bool(mask & 0xE0)
 
 
 def parse_live(buf: bytes) -> LiveData:
@@ -126,10 +126,20 @@ def parse_live(buf: bytes) -> LiveData:
     )
 
 
-def parse_eeprom(buf: bytes) -> EepromData:
-    """Decode the bounded EEPROM image; all other bytes remain opaque."""
+def validate_eeprom(buf: bytes) -> None:
+    """Require a complete length-prefixed image before decoding any fields."""
     if not 909 <= len(buf) <= 1100:
         raise ProtocolError("EEPROM reply must contain 909..1100 bytes")
+    expected = int.from_bytes(buf[:2], "little") + 2
+    if expected != len(buf):
+        raise ProtocolError(
+            f"EEPROM length mismatch: expected {expected} bytes, got {len(buf)}"
+        )
+
+
+def parse_eeprom(buf: bytes) -> EepromData:
+    """Decode a complete EEPROM image; all other bytes remain opaque."""
+    validate_eeprom(buf)
     raw = bytes(buf)
     if not all(0x20 <= byte <= 0x7E for byte in raw[2:9]):
         raise ProtocolError("EEPROM model must be printable ASCII")
@@ -144,17 +154,10 @@ def parse_eeprom(buf: bytes) -> EepromData:
 
 
 def is_completion(notification: bytes) -> Completion | None:
-    """Provisional completion heuristic from wiki/integration-plan.md §4.
-
-    ponytail: short printable envelopes only until G1 supplies real framing;
-    a printable binary chunk containing a token remains inherently ambiguous.
-    """
-    text = notification.rstrip(b"\r\n\0 \t\v\f")
-    if len(text) > 64 or not all(0x20 <= byte <= 0x7E for byte in text):
-        return None
-    ok, fail = b"Success" in text, b"Fail" in text
-    if ok and fail:
-        return Completion.CONFLICT
-    if ok:
+    """Match an exact status envelope, allowing trailing CR, LF and NUL."""
+    text = notification.rstrip(b"\r\n\0")
+    if text == b'{"Sts": Success}':
         return Completion.OK
-    return Completion.FAIL if fail else None
+    if text == b'{"Sts": Fail}':
+        return Completion.FAIL
+    return None
