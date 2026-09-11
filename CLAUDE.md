@@ -34,13 +34,15 @@ before editing the wiki.
   Decompiled tree: `sources/decompiled/jadx/sources/net/microair/easystart/`.
 - The HA integration follows HA custom-component conventions; keep the protocol
   layer (`microair/`) free of HA imports so it is unit-testable.
-- Home Assistant access for live scans: direct URL `http://hass.joyful.house:8123`
-  (WebSocket `ws://hass.joyful.house:8123/api/websocket`); the long-lived token
-  is `HA_PROD_LONG_LIVED_TOKEN` in `../eg4_web_monitor/.env`. Never commit or
-  print tokens; keep local copies in a git-ignored `.env`.
-- Nearest known Bluetooth proxy to the unit: ESPHome `aiosense-kaelyns-bedroom`
-  (10.100.0.134, `bluetooth_proxy: active: true`; config in
-  `../aiosense/devices/aiosense-kaelyns-bedroom.yaml`).
+- Home Assistant access for live scans: set `HA_URL` and `HA_TOKEN` (a
+  long-lived access token) in a git-ignored `.env`; never commit, print, or
+  pass tokens on a command line. Environment specifics (hostnames, proxy names
+  and addresses) live in the operator's private notes, not in this repo.
+- **Bluetooth path policy:** the integration reaches the unit only through Home
+  Assistant's Bluetooth stack — the nearest **ESPHome active BLE proxy** in
+  production. Do not stand up an ad-hoc host adapter (a desktop's `hci0`) as
+  the production path; `scripts/probe.py` on a laptop is for one-off read-only
+  diagnostics only.
 
 ## Safety when live-testing
 

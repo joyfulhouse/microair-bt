@@ -6,13 +6,13 @@ Status: **unverified — unit not yet heard.**
 
 Source: `docs/claude/research/explore-ha-ble-scan.md` + `ble-scan-dump.json`
 (2026-09-10, passive `bluetooth/subscribe_advertisements` over the HA
-websocket at `hass.joyful.house`, 90 s + 180 s windows). No GATT connection
+websocket at `<ha-host>`, 90 s + 180 s windows). No GATT connection
 was attempted.
 
 ## Result (2026-09-10)
 
-- Nearest proxy: `aiosense-kaelyns-bedroom`, source MAC `70:04:1D:1F:3B:8A`,
-  IP 10.100.0.134, ESPHome `bluetooth_proxy: active: true`, registered in HA as a
+- Nearest proxy: the ESPHome AIOsense node in the room adjacent to the condenser,
+  ESPHome `bluetooth_proxy: active: true`, registered in HA as a
   **connectable** remote scanner.
 - **No advertisement matched** any of: name containing `EasyStart` / `MicroAir`,
   name starting `ES`, or service UUID `d973f2e0-b19e-11e2-9e96-0800200c9a66` —
@@ -29,7 +29,7 @@ was attempted.
    satisfied / the system was off, nothing would advertise.
 2. The OEM app (or another client) was **connected**, so it stopped advertising.
 3. **Range** — reported usable range is ~3–6 ft; the outdoor condenser may be
-   too far from Kaelyn's-bedroom proxy.
+   too far from the nearest indoor proxy.
 4. Advertises **without a name or service UUID** in the ADV packet (name only
    in the scan response, which passive subscription may still surface).
 
@@ -41,3 +41,14 @@ was attempted.
    `scripts/probe.py`) near the condenser.
 3. Record here: address, address type, name, RSSI per proxy, connectable flag,
    raw ADV/scan-response bytes.
+
+## Host-adapter probe (2026-09-10, outside HA)
+
+Read-only `scripts/probe.py` runs from a Linux host adapter (BlueZ `hci0`)
+near the condenser did connect and read the unit: `EasyStart_88CD`, model
+`398ULBT`, firmware 37, `startup_mask 0x00`, status `NORMAL`. This confirms
+the GATT read path and the decoders, but not the HA proxy path — the unit has
+still not been captured advertising on an ESPHome proxy. A single `SMask`
+write from that host returned BlueZ `Operation Not Authorized` and readbacks
+never changed; see [index](index.md). Host adapters are a diagnostic tool only:
+the production connection is HA's nearest ESPHome active proxy.

@@ -4,7 +4,7 @@ COMPLETE
 
 Subject: `wiki/integration-plan.md` (v1 spec) at `b895a575bf717dade21feba4a49b70b117fea456`.
 Contract sha256: `59f75f5bb32786a70842b0887ec801070cefd6796607cce198eb27e1926fcd58`.
-Machine report: `/Users/bryanli/Projects/joyfulhouse/homeassistant-dev/microair-bt/.pollux/reports/debate-spec-anthropic.json`.
+Machine report: `.pollux/reports/debate-spec-anthropic.json`.
 
 MODEL requested=claude-fable-5-1[1m] observed=unknown source=unknown
 
@@ -74,7 +74,7 @@ FOLLOWUPS: resolve §11.4 via the HA proxy scan, not the laptop; run the PR-1 pr
 | Flex update branch `ProgMode → 5 s → ChipErase` | `explore-apk-protocol-openai.md:175`, `-anthropic.md:105-106` (both cite `Update.java:528-553`) | Accepted from two agreeing reads; not re-read line by line. |
 | No compressor-idle check, no confirm dialog in the app's relearn path | `Relearn.java:250-262` (Send), `:420-457` (dispatch) | **Verified** — the app writes whenever the UI mask differs. |
 
-HA API facts checked against the installed 2026.1.3 (`/Users/bryanli/Projects/joyfulhouse/homeassistant-dev/.venv/lib/python3.14/site-packages/homeassistant`):
+HA API facts checked against the installed 2026.1.3 (`../.venv/lib/python3.14/site-packages/homeassistant`):
 
 - `bluetooth/match.py:35, 384-396`: `local_name` matchers may not contain a wildcard in the first 3 characters; `EasyStart_*` is legal.
 - `bluetooth/api.py:106-135, 177-191`: `async_ble_device_from_address`, `async_register_callback`, `async_track_unavailable`, `async_last_service_info` exist; `update_coordinator.py:22-45` derives availability from advertisement presence. Used by D-6/D-7.

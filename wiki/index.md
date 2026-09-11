@@ -8,17 +8,17 @@ from HA.
 
 > Read [SCHEMA](SCHEMA.md) first if you're going to edit the wiki.
 
-## Effort status (2026-09-10)
+## Effort status (2026-09-11)
 
 | Workstream | State |
 |---|---|
 | APK acquired + decompiled (jadx + apktool) | ✅ done — see [sources](sources.md) |
 | BLE protocol reverse-engineered from source | ✅ done — two independent reads agree ([ble-protocol](ble-protocol.md)) |
 | Public documentation / prior art collected | ✅ done — OEM relearn procedure + community ESPHome read path ([device-easystart-flex](device-easystart-flex.md)) |
-| Device located on an HA Bluetooth proxy | ❌ **not heard** in a 270 s passive scan — likely unpowered / A/C idle ([ha-proxy-coverage](ha-proxy-coverage.md)) |
+| Device located on an HA Bluetooth proxy | ⚠️ **not yet heard by a proxy** (270 s passive scan 2026-09-10, A/C likely idle). Heard and read once via a host adapter probe: `EasyStart_88CD`, model `398ULBT`, fw 37 ([ha-proxy-coverage](ha-proxy-coverage.md)). Production path is HA's nearest ESPHome active proxy, never an ad-hoc host adapter. |
 | Specification for the integration | ✅ v1.1 — [integration-plan](integration-plan.md); three-vendor /debate REVISE×3 folded in (`docs/claude/research/debate-spec-synthesis.md`); awaiting plan-gate ruling |
-| HA custom integration | 🔄 **PR-1 in tribunal** — [PR #1](https://github.com/joyfulhouse/microair-bt/pull/1) (protocol lib + BLE client + probe; gates green, spec-gate compliant, blocking reviews FINDINGS → fix wave r2 in flight) |
-| Live validation on real device | ⏳ blocked on hearing the unit |
+| HA custom integration | ✅ **merged + released** — PR #1 protocol lib/BLE client/probe, PR #2 hardening, PR #3 HA integration (sensors, binary sensors, polling switch, `set_startup_mode`); shipped as **v0.2.0** via HACS custom repository |
+| Live validation on real device | ⚠️ **read path exercised, write path unverified.** 2026-09-10 host-adapter probes read EEP/LIVE; one `SMask` write attempt returned BlueZ `NotAuthorized` and every readback still showed `startup_mask 0`. Telemetry was also internally inconsistent across the day (`total_starts` 3671 vs 7), so treat both results as unconfirmed until reproduced over the HA proxy path. |
 
 ## The one-paragraph answer
 
