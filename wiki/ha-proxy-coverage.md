@@ -2,7 +2,7 @@
 
 Purpose: which HA Bluetooth proxies hear the unit, at what RSSI, and which
 should be used for GATT connections.
-Status: **unverified — unit not yet heard.**
+Status: **verified live (2026-09-12)** — both units heard, connected and read over ESPHome active proxies; links marginal.
 
 Source: `docs/claude/research/explore-ha-ble-scan.md` + `ble-scan-dump.json`
 (2026-09-10, passive `bluetooth/subscribe_advertisements` over the HA
@@ -21,7 +21,23 @@ was attempted.
   `PRP1-RD_2FF9` −70 dBm, `SPU-00009694-V002` −70 dBm, plus unnamed devices
   down to −97 dBm — so the proxy is alive and hearing weak signals.
 
-## Likely explanations (resolve with the human)
+## Result (2026-09-11/12, live over HA proxies)
+
+- Two EasyStarts exist, one per A/C system. Each advertises **only while its
+  A/C is calling for cooling**, which is why the 2026-09-10 idle-A/C scan heard
+  nothing.
+- Advertisements arrive at **−75 to −94 dBm**; HA's connection scorer picks a
+  different proxy from poll to poll (whichever heard the last advert best).
+  The proxy in the room nearest each condenser is not always the winner.
+- GATT connects succeed at MTU 23 on the first or second attempt. The **~1 KB
+  `ReadEEP` reply (≈50 notification frames) drops a frame often enough that a
+  poll depending on it fails most of the time** (`EEPROM length mismatch:
+  expected 1023 bytes, got 1003`); the 1–4-frame `ReadLive` reply is reliable.
+  This drove the v0.2.2 design: poll `ReadLive` only, cache the EEPROM image.
+- Discovery-flow setup (which needs one complete `ReadEEP`) typically needs
+  two or three **Configure** attempts on these links.
+
+## Likely explanations for a silent scan (historical, resolved)
 
 1. The unit was **unpowered** — the EasyStart draws control power from the A/C
    and community reports say it advertises only while the HVAC is calling
