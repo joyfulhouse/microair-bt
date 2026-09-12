@@ -1,5 +1,6 @@
 """Discover and bind one EasyStart model to each Bluetooth address."""
 
+import logging
 import re
 from typing import Any
 
@@ -24,6 +25,8 @@ from .const import (
 )
 from .microair.client import CONTROL_MODELS, MicroAirClient
 from .microair.protocol import ProtocolError
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class MicroAirConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -104,7 +107,8 @@ class MicroAirConfigFlow(ConfigFlow, domain=DOMAIN):
             client = MicroAirClient(device, max_attempts=1)
             async with client.transaction():
                 eeprom = await client.read_eeprom()
-        except (BleakError, OSError, ProtocolError):
+        except (BleakError, OSError, ProtocolError) as error:
+            _LOGGER.debug("Setup read from %s failed: %s", self._address, error)
             return self.async_show_form(
                 step_id=step,
                 data_schema=(

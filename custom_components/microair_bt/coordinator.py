@@ -20,6 +20,7 @@ from .const import (
     CONF_POLLING_ENABLED,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
+    EEPROM_REFRESH_INTERVAL,
     MAX_BACKOFF,
     MIN_POLL_INTERVAL,
 )
@@ -31,7 +32,9 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class MicroAirData:
-    eeprom: EepromData
+    # None until a complete EEPROM image has been read on this link; live
+    # telemetry does not wait for it.
+    eeprom: EepromData | None
     live: LiveData
 
 
@@ -51,6 +54,8 @@ class MicroAirCoordinator(DataUpdateCoordinator[MicroAirData | None]):
         self._next_poll = 0.0
         self._failures = 0
         self._poll_task: asyncio.Task[None] | None = None
+        self._eeprom: EepromData | None = None
+        self._eeprom_at = 0.0
         self._unsubscribers: list[Callable[[], None]] = []
 
     @property
@@ -142,10 +147,7 @@ class MicroAirCoordinator(DataUpdateCoordinator[MicroAirData | None]):
                     raise UpdateFailed("EasyStart is backing off after a failed read")
                 return self.data
             try:
-                client = self.client_for_current_route()
-                async with client.transaction():
-                    eeprom = await client.read_eeprom()
-                    live = await client.read_live()
+                live, eeprom = await self._async_read()
             except (BleakError, OSError, ProtocolError, UpdateFailed) as error:
                 self._failures = min(self._failures + 1, 8)
                 backoff = min(MAX_BACKOFF, self.poll_interval * 2**self._failures)
@@ -160,6 +162,54 @@ class MicroAirCoordinator(DataUpdateCoordinator[MicroAirData | None]):
             # only while powered, rechecking presence and the gate before I/O.
             self.update_interval = timedelta(seconds=self.poll_interval)
             return MicroAirData(eeprom, live)
+
+    def _eeprom_due(self) -> bool:
+        return (
+            self._eeprom is None
+            or monotonic() - self._eeprom_at >= EEPROM_REFRESH_INTERVAL
+        )
+
+    async def _async_read(self) -> tuple[LiveData, EepromData | None]:
+        """Read live telemetry every poll; read the EEPROM image only when due.
+
+        The small ReadLive reply is read first so a dropped frame in the long
+        ReadEEP transfer never costs the poll. A failed refresh keeps the
+        cached image; a failed bootstrap read gets one immediate retry on a
+        fresh connection and otherwise leaves the EEPROM fields unknown.
+        """
+        client = self.client_for_current_route()
+        async with client.transaction():
+            live = await client.read_live()
+            if not self._eeprom_due():
+                return live, self._eeprom
+            try:
+                eeprom = await client.read_eeprom()
+            except (BleakError, OSError, ProtocolError) as error:
+                _LOGGER.debug("EEPROM read failed after live read: %s", error)
+                if self._eeprom is not None:
+                    return live, self._eeprom
+            else:
+                self.cache_eeprom(eeprom)
+                return live, eeprom
+        # Bootstrap: no image yet. One retry, then continue with live data only.
+        retry = self.client_for_current_route()
+        try:
+            async with retry.transaction():
+                eeprom = await retry.read_eeprom()
+        except (BleakError, OSError, ProtocolError) as error:
+            _LOGGER.warning(
+                "EasyStart EEPROM image not readable yet (%s); model, firmware "
+                "and startup mask stay unknown until a complete read succeeds",
+                error,
+            )
+            return live, None
+        self.cache_eeprom(eeprom)
+        return live, eeprom
+
+    def cache_eeprom(self, eeprom: EepromData) -> None:
+        """Record a verified image; explicit writes call this after readback."""
+        self._eeprom = eeprom
+        self._eeprom_at = monotonic()
 
     def client_for_current_route(self) -> MicroAirClient:
         """Caller holds lock; resolve anew for both polling and explicit writes."""

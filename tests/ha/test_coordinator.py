@@ -35,7 +35,7 @@ async def coordinator(
 async def test_fresh_route_after_lock(
     coordinator: MicroAirCoordinator, ble: BluetoothHarness, source: str
 ) -> None:
-    ble.replies = [chunks(EEPROM), chunks(LIVE)]
+    ble.replies = [chunks(LIVE), chunks(EEPROM)]
     await coordinator.lock.acquire()
     task = asyncio.create_task(coordinator.async_refresh())
     await asyncio.sleep(0)
@@ -55,7 +55,7 @@ async def test_fresh_route_after_lock(
 async def test_advertisement_elapsed_gate_and_no_overlap(
     coordinator: MicroAirCoordinator, ble: BluetoothHarness, hass: HomeAssistant
 ) -> None:
-    ble.replies = [chunks(EEPROM), chunks(LIVE), chunks(EEPROM), chunks(LIVE)]
+    ble.replies = [chunks(LIVE), chunks(EEPROM), chunks(LIVE)]
     await coordinator.async_start()
     for _ in range(5):
         ble.advertise()
@@ -88,7 +88,7 @@ async def test_offline_start_and_recovery(
     assert not coordinator.last_update_success
     assert not coordinator.powered
     assert "not advertising" in caplog.text
-    ble.replies = [chunks(EEPROM), chunks(LIVE)]
+    ble.replies = [chunks(LIVE), chunks(EEPROM)]
     ble.advertise()
     await hass.async_block_till_done(wait_background_tasks=True)
     assert coordinator.powered
@@ -130,7 +130,7 @@ async def test_busy_backoff_and_recovery(
     await hass.async_block_till_done(wait_background_tasks=True)
     assert len(ble.clients) == 1
     ble.now += 30
-    ble.replies = [chunks(EEPROM), chunks(LIVE)]
+    ble.replies = [chunks(LIVE), chunks(EEPROM)]
     ble.error_at = None
     ble.advertise()
     await hass.async_block_till_done(wait_background_tasks=True)
@@ -150,11 +150,11 @@ async def test_polling_pause_persisted_and_independent(
     await hass.async_block_till_done(wait_background_tasks=True)
     assert not ble.clients
     other = MicroAirCoordinator(hass, make_entry(DOWNSTAIRS))
-    ble.replies = [chunks(EEPROM), chunks(LIVE)]
+    ble.replies = [chunks(LIVE), chunks(EEPROM)]
     await other.async_refresh()
     assert ble.connected[0].address == DOWNSTAIRS
     assert other.lock is not coordinator.lock
-    ble.replies = [chunks(EEPROM), chunks(LIVE)]
+    ble.replies = [chunks(LIVE), chunks(EEPROM)]
     await coordinator.async_set_polling(True)
     await hass.async_block_till_done(wait_background_tasks=True)
     assert coordinator.polling_enabled
@@ -175,7 +175,7 @@ async def test_shutdown_cancels_transaction_and_callbacks(
     ble.present.clear()
     await coordinator.async_start()
     ble.block = "write"
-    ble.replies = [chunks(EEPROM), chunks(LIVE)]
+    ble.replies = [chunks(LIVE), chunks(EEPROM)]
     ble.advertise()
     await ble.entered.wait()
     await coordinator.async_shutdown()
@@ -186,20 +186,57 @@ async def test_shutdown_cancels_transaction_and_callbacks(
     assert len(ble.clients) == 1
 
 
-async def test_short_read_unavailable_then_retry(
+async def test_short_eeprom_keeps_live_then_backfills(
+    coordinator: MicroAirCoordinator,
+    ble: BluetoothHarness,
+    hass: HomeAssistant,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Bootstrap: live read succeeds, the EEPROM image is short twice (one
+    # retry on a fresh connection). The poll still succeeds with live data.
+    ble.replies = [chunks(LIVE), chunks(EEPROM[:-3]), chunks(EEPROM[:-3])]
+    await coordinator.async_start()
+    assert coordinator.last_update_success
+    assert coordinator.data is not None
+    assert coordinator.data.live.current_a == 9.2
+    assert coordinator.data.eeprom is None
+    assert len(ble.clients) == 2
+    assert all(not client.is_connected for client in ble.clients)
+    assert "not readable yet" in caplog.text
+    # The next poll tries the image again and backfills it.
+    ble.now += 60
+    ble.replies = [chunks(LIVE), chunks(EEPROM)]
+    ble.advertise()
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert coordinator.data is not None and coordinator.data.eeprom is not None
+    assert coordinator.data.eeprom.model == "398ULBT"
+    await coordinator.async_shutdown()
+
+
+async def test_steady_state_polls_live_only_and_keeps_cached_eeprom(
     coordinator: MicroAirCoordinator, ble: BluetoothHarness, hass: HomeAssistant
 ) -> None:
-    ble.replies = [chunks(EEPROM[:-3]), chunks(LIVE)]
+    ble.replies = [chunks(LIVE), chunks(EEPROM)]
     await coordinator.async_start()
-    assert not coordinator.last_update_success
-    assert coordinator.data is None
-    assert not ble.clients[-1].is_connected
+    assert coordinator.data is not None and coordinator.data.eeprom is not None
+    cached = coordinator.data.eeprom
+    # Within the refresh interval only the small ReadLive request is sent.
     ble.now += 60
-    ble.replies = [chunks(EEPROM), chunks(LIVE)]
+    ble.replies = [chunks(LIVE)]
+    ble.advertise()
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert [payload for _, payload, _ in ble.clients[-1].writes] == [
+        b'{"Cmd": ReadLive}'
+    ]
+    assert coordinator.data is not None and coordinator.data.eeprom is cached
+    # A failed refresh once the image is due keeps the cached copy.
+    ble.now += 3600
+    ble.replies = [chunks(LIVE), chunks(EEPROM[:-3])]
     ble.advertise()
     await hass.async_block_till_done(wait_background_tasks=True)
     assert coordinator.last_update_success
-    assert coordinator.data is not None
+    assert coordinator.data is not None and coordinator.data.eeprom is cached
+    assert len(ble.clients) == 3
     await coordinator.async_shutdown()
 
 
@@ -239,7 +276,7 @@ async def test_unchanged_advertisements_keep_polling(
             address, connectable
         ),
     )
-    ble.replies = [chunks(EEPROM), chunks(LIVE)]
+    ble.replies = [chunks(LIVE), chunks(EEPROM)]
     if first_read_fails:
         ble.error_at = "notify"
     await coordinator.async_start()
@@ -249,7 +286,7 @@ async def test_unchanged_advertisements_keep_polling(
     manager.scanner_adv_received(ble.info())
     assert manager.deliveries == 1  # HA suppresses this unchanged advertisement.
     ble.error_at = None
-    ble.replies = [chunks(EEPROM), chunks(LIVE)]
+    ble.replies = [chunks(LIVE), chunks(EEPROM)] if first_read_fails else [chunks(LIVE)]
     async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=delay))
     await hass.async_block_till_done(wait_background_tasks=True)
     assert len(ble.clients) == 2

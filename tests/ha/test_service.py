@@ -170,7 +170,7 @@ async def test_device_target_and_allow_running(
 ) -> None:
     second = make_entry(DOWNSTAIRS, allow_running=True)
     second.add_to_hass(hass)
-    ble.replies = [chunks(EEPROM), chunks(LIVE)]
+    ble.replies = [chunks(LIVE), chunks(EEPROM)]
     assert await hass.config_entries.async_setup(second.entry_id)
     device = dr.async_get(hass).async_get_device(
         identifiers={("microair_bt", DOWNSTAIRS)}

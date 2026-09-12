@@ -110,6 +110,7 @@ class MicroAirClient:
         self._pending: asyncio.Future[bytes] | None = None
         self._command: Command | None = None
         self._buffer = bytearray()
+        self._frames = 0
         self.startup_write_state = StartupWriteState.NOT_ATTEMPTED
 
     def _connected(self) -> BleakClient:
@@ -222,6 +223,12 @@ class MicroAirClient:
             if self._command is Command.SET_STARTUP_MASK:
                 self.startup_write_state = StartupWriteState.ACKNOWLEDGED
             raw = bytes(self._buffer)
+            _LOGGER.debug(
+                "%s complete: %s bytes in %s frames",
+                self._command.name if self._command else "command",
+                len(raw),
+                self._frames,
+            )
             try:
                 if self._command is Command.READ_EEP:
                     parse_eeprom(raw)
@@ -242,6 +249,7 @@ class MicroAirClient:
                 self._fail(ProtocolError(f"Reply exceeds {cap}-byte cap"))
             else:
                 self._buffer.extend(data)
+                self._frames += 1
 
     async def run(
         self, cmd: Command, arg: int | None = None, *, timeout: float
@@ -262,6 +270,7 @@ class MicroAirClient:
             raise ValueError("timeout must be finite and positive")
         try:
             self._buffer.clear()
+            self._frames = 0
             self._command = cmd
             pending: asyncio.Future[bytes] = asyncio.get_running_loop().create_future()
             self._pending = pending

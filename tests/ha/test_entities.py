@@ -149,7 +149,7 @@ async def test_multi_device_reload_unload(
 ) -> None:
     second = make_entry(DOWNSTAIRS)
     second.add_to_hass(hass)
-    ble.replies = [chunks(EEPROM), chunks(LIVE)]
+    ble.replies = [chunks(LIVE), chunks(EEPROM)]
     assert await hass.config_entries.async_setup(second.entry_id)
     await hass.async_block_till_done()
     first_id = entity_id(hass, "sensor", "status")
