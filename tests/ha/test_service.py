@@ -60,7 +60,8 @@ async def test_modes_readback_and_notification(
     ]
     assert not ble.clients[-1].is_connected
     coordinator: MicroAirCoordinator = loaded.runtime_data
-    assert coordinator.data is not None and coordinator.data.eeprom.startup_mask == mask
+    assert coordinator.data is not None and coordinator.data.eeprom is not None
+    assert coordinator.data.eeprom.startup_mask == mask
     notifications = hass.data["persistent_notification"]
     text = str(notifications)
     assert "power" in text.lower() and "5" in text and "30" in text
