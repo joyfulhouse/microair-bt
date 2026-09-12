@@ -24,5 +24,3 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
-          # Brand assets are not bundled yet; drop this once brand/ ships.
-          ignore: brands
