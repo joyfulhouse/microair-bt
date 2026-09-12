@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-09-12
+
+### Changed
+
+- **Polls read live telemetry only.** The ~1 KB EEPROM image (about 50
+  notification frames at the proxy MTU of 23) is now read at the first
+  successful poll, after a `set_startup_mode` readback, and at most hourly;
+  every other poll sends just `ReadLive`. On a marginal ESPHome-proxy link a
+  single dropped frame in the EEPROM transfer used to fail the whole poll and
+  leave every entity unavailable (#6).
+- The live read runs first, so a failed EEPROM refresh keeps the cached image
+  and the poll still succeeds. A failed bootstrap read gets one immediate retry
+  on a fresh connection; until an image is read the model, firmware and startup
+  mask sensors report unknown while telemetry flows.
+
+### Added
+
+- Debug logging of the reassembled reply size and frame count per command, and
+  of the underlying error when config-flow setup cannot read the unit.
+
 ## [0.2.1] - 2026-09-12
 
 ### Added
@@ -74,7 +94,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   decoded telemetry fields, device identity and OEM relearn procedure, and the
   integration specification.
 
-[Unreleased]: https://github.com/joyfulhouse/microair-bt/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/joyfulhouse/microair-bt/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/joyfulhouse/microair-bt/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/joyfulhouse/microair-bt/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/joyfulhouse/microair-bt/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/joyfulhouse/microair-bt/releases/tag/v0.1.0

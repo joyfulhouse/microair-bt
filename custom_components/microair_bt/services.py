@@ -155,6 +155,7 @@ async def _async_write(
                     else "INDETERMINATE",
                 )
             raise
+        coordinator.cache_eeprom(eeprom)
         coordinator.async_set_updated_data(MicroAirData(eeprom, live))
         _notify(coordinator, "STORED (startup mask matched EEPROM readback)")
         return {"outcome": "STORED", "startup_mask": f"0x{expected:02X}"}

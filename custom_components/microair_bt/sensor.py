@@ -96,19 +96,19 @@ SENSORS = (
         key="model",
         name="Model",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value=lambda data: data.eeprom.model,
+        value=lambda data: data.eeprom.model if data.eeprom else None,
     ),
     MicroAirSensorDescription(
         key="firmware",
         name="Firmware",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value=lambda data: data.eeprom.firmware,
+        value=lambda data: data.eeprom.firmware if data.eeprom else None,
     ),
     MicroAirSensorDescription(
         key="startup_mask",
         name="Startup mask",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value=lambda data: f"0x{data.eeprom.startup_mask:02X}",
+        value=lambda data: f"0x{data.eeprom.startup_mask:02X}" if data.eeprom else None,
     ),
 )
 
