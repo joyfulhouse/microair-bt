@@ -318,3 +318,24 @@ async def test_cancellation_tracks_actual_write_phase(
         assert "INDETERMINATE" in notifications
         assert any(b"SMask=" in payload for _, payload, _ in ble.clients[-1].writes)
     assert not ble.clients[-1].is_connected
+
+
+async def test_write_rejected_while_live_mode_active(
+    hass: HomeAssistant, ble: BluetoothHarness
+) -> None:
+    # Live mode holds the single BLE central open; a startup-mode write cannot
+    # share it and must be rejected up front rather than hang on the lock.
+    ble.present.clear()  # keep the live task idle so no BLE traffic occurs
+    entry = make_entry(live_mode=True)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    with pytest.raises(ServiceValidationError, match="Live mode"):
+        await hass.services.async_call(
+            "microair_bt",
+            "set_startup_mode",
+            {"entry": entry.entry_id, "mode": "relearn", "confirm": True},
+            blocking=True,
+            return_response=True,
+        )
+    assert await hass.config_entries.async_unload(entry.entry_id)

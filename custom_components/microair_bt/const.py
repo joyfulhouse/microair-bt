@@ -19,3 +19,11 @@ CONF_NOMINAL_VOLTAGE = "nominal_voltage"
 CONF_POWER_FACTOR = "power_factor"
 DEFAULT_NOMINAL_VOLTAGE = 240.0
 DEFAULT_POWER_FACTOR = 0.9
+# Optional "live" mode holds one GATT connection open through a single proxy
+# and reads ReadLive on a fast timer (like the OEM app), instead of the default
+# connect-per-poll. It trades the reliability of the reconnect-per-read design
+# for near-real-time current at the cost of monopolising the one BLE central.
+CONF_LIVE_MODE = "live_mode"
+CONF_LIVE_INTERVAL = "live_interval"
+DEFAULT_LIVE_INTERVAL = 5
+MIN_LIVE_INTERVAL = 2

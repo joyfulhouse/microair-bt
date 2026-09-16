@@ -97,6 +97,12 @@ def _notify(coordinator: MicroAirCoordinator, outcome: str) -> None:
 async def _async_write(
     coordinator: MicroAirCoordinator, mode: StartupMode
 ) -> ServiceResponse:
+    # Live mode holds the single BLE central open, so a write cannot share the
+    # link. Reject early (before contending for the lock) rather than hang.
+    if coordinator.live_mode:
+        raise ServiceValidationError(
+            "REJECTED: turn off Live mode (or the Polling switch) before writing"
+        )
     async with coordinator.lock:
         if coordinator.stopping or not coordinator.polling_enabled:
             raise ServiceValidationError(
