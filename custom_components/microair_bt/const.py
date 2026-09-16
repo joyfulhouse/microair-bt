@@ -12,3 +12,10 @@ MAX_BACKOFF = 300
 # only has to carry the small ReadLive reply on every poll.
 EEPROM_REFRESH_INTERVAL = 3600
 SERVICE_SET_STARTUP_MODE = "set_startup_mode"
+# The EasyStart reports compressor current but no line voltage, so the power
+# sensor is an estimate: current x nominal voltage x power factor. Both are
+# operator-tunable because they depend on the mains and the compressor.
+CONF_NOMINAL_VOLTAGE = "nominal_voltage"
+CONF_POWER_FACTOR = "power_factor"
+DEFAULT_NOMINAL_VOLTAGE = 240.0
+DEFAULT_POWER_FACTOR = 0.9

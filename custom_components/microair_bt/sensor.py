@@ -13,6 +13,7 @@ from homeassistant.const import (
     EntityCategory,
     UnitOfElectricCurrent,
     UnitOfFrequency,
+    UnitOfPower,
     UnitOfTime,
 )
 from homeassistant.core import HomeAssistant
@@ -118,9 +119,12 @@ async def async_setup_entry(
     entry: MicroAirConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    async_add_entities(
-        MicroAirSensor(entry.runtime_data, description) for description in SENSORS
-    )
+    coordinator = entry.runtime_data
+    entities: list[SensorEntity] = [
+        MicroAirSensor(coordinator, description) for description in SENSORS
+    ]
+    entities.append(MicroAirPowerSensor(coordinator))
+    async_add_entities(entities)
 
 
 class MicroAirSensor(MicroAirEntity, SensorEntity):
@@ -146,3 +150,43 @@ class MicroAirSensor(MicroAirEntity, SensorEntity):
         ):
             return {"raw_status": self.coordinator.data.live.raw_status}
         return None
+
+
+class MicroAirPowerSensor(MicroAirEntity, SensorEntity):
+    """Estimated compressor real power from the measured current.
+
+    The EasyStart reports compressor current but not line voltage, so this is
+    an estimate: current x nominal voltage x power factor (both configurable).
+    It covers the compressor only, not the air handler, and refreshes at the
+    polling cadence. The assumptions are exposed as attributes so the estimate
+    is transparent; for revenue-grade energy use a dedicated meter.
+    """
+
+    _attr_name = "Power"
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, coordinator: MicroAirCoordinator) -> None:
+        super().__init__(coordinator, "power")
+
+    @property
+    def native_value(self) -> float | None:
+        data = self.coordinator.data
+        if data is None:
+            return None
+        return (
+            data.live.current_a
+            * self.coordinator.nominal_voltage
+            * self.coordinator.power_factor
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        return {
+            "estimate": True,
+            "scope": "compressor_only",
+            "nominal_voltage": self.coordinator.nominal_voltage,
+            "power_factor": self.coordinator.power_factor,
+        }

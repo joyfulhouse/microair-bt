@@ -110,18 +110,41 @@ async def test_options_interval_floor(
     entry.add_to_hass(hass)
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] == FlowResultType.FORM
+    base = {"allow_running": True, "nominal_voltage": 240, "power_factor": 0.9}
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"poll_interval": 14, "allow_running": True}
+        result["flow_id"], {"poll_interval": 14, **base}
     )
     assert result["type"] == FlowResultType.FORM
     assert result["errors"] == {"base": "invalid_interval"}
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"poll_interval": 45, "allow_running": True}
+        result["flow_id"],
+        {
+            "poll_interval": 45,
+            "allow_running": True,
+            "nominal_voltage": 500,
+            "power_factor": 0.9,
+        },
+    )
+    assert result["errors"] == {"base": "invalid_voltage"}
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            "poll_interval": 45,
+            "allow_running": True,
+            "nominal_voltage": 240,
+            "power_factor": 1.5,
+        },
+    )
+    assert result["errors"] == {"base": "invalid_power_factor"}
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"poll_interval": 45, **base}
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert entry.options == {
         "poll_interval": 45,
         "allow_running": True,
+        "nominal_voltage": 240.0,
+        "power_factor": 0.9,
         "polling_enabled": False,
     }
 

@@ -16,9 +16,13 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import (
     CONF_ALLOW_RUNNING,
+    CONF_NOMINAL_VOLTAGE,
     CONF_POLL_INTERVAL,
     CONF_POLLING_ENABLED,
+    CONF_POWER_FACTOR,
+    DEFAULT_NOMINAL_VOLTAGE,
     DEFAULT_POLL_INTERVAL,
+    DEFAULT_POWER_FACTOR,
     DOMAIN,
     EEPROM_REFRESH_INTERVAL,
     MAX_BACKOFF,
@@ -65,6 +69,16 @@ class MicroAirCoordinator(DataUpdateCoordinator[MicroAirData | None]):
     @property
     def allow_running(self) -> bool:
         return bool(self.entry.options.get(CONF_ALLOW_RUNNING, False))
+
+    @property
+    def nominal_voltage(self) -> float:
+        return float(
+            self.entry.options.get(CONF_NOMINAL_VOLTAGE, DEFAULT_NOMINAL_VOLTAGE)
+        )
+
+    @property
+    def power_factor(self) -> float:
+        return float(self.entry.options.get(CONF_POWER_FACTOR, DEFAULT_POWER_FACTOR))
 
     @property
     def poll_interval(self) -> int:

@@ -144,6 +144,33 @@ async def test_unpowered_availability_and_pause(
     assert len(ble.clients) == 1
 
 
+async def test_power_estimate_and_options(
+    hass: HomeAssistant, ble: BluetoothHarness, loaded: MockConfigEntry
+) -> None:
+    # Default estimate: current (9.2 A) x 240 V x 0.9 PF.
+    power = get_state(hass, entity_id(hass, "sensor", "power"))
+    assert float(power.state) == pytest.approx(9.2 * 240.0 * 0.9)
+    assert power.attributes["device_class"] == "power"
+    assert power.attributes["unit_of_measurement"] == "W"
+    assert power.attributes["state_class"] == "measurement"
+    assert power.attributes["estimate"] is True
+    assert power.attributes["scope"] == "compressor_only"
+    assert power.attributes["nominal_voltage"] == 240.0
+    assert power.attributes["power_factor"] == 0.9
+
+    # Editing the assumptions rescales the estimate without any new BLE read.
+    hass.config_entries.async_update_entry(
+        loaded,
+        options={**loaded.options, "nominal_voltage": 208.0, "power_factor": 0.85},
+    )
+    await hass.async_block_till_done()
+    coordinator: MicroAirCoordinator = loaded.runtime_data
+    coordinator.async_update_listeners()
+    await hass.async_block_till_done()
+    power = get_state(hass, entity_id(hass, "sensor", "power"))
+    assert float(power.state) == pytest.approx(9.2 * 208.0 * 0.85)
+
+
 async def test_multi_device_reload_unload(
     hass: HomeAssistant, ble: BluetoothHarness, loaded: MockConfigEntry
 ) -> None:

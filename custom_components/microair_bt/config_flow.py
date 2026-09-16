@@ -18,8 +18,12 @@ from homeassistant.core import callback
 
 from .const import (
     CONF_ALLOW_RUNNING,
+    CONF_NOMINAL_VOLTAGE,
     CONF_POLL_INTERVAL,
+    CONF_POWER_FACTOR,
+    DEFAULT_NOMINAL_VOLTAGE,
     DEFAULT_POLL_INTERVAL,
+    DEFAULT_POWER_FACTOR,
     DOMAIN,
     MIN_POLL_INTERVAL,
 )
@@ -141,8 +145,14 @@ class MicroAirOptionsFlow(OptionsFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             interval = user_input[CONF_POLL_INTERVAL]
+            voltage = user_input[CONF_NOMINAL_VOLTAGE]
+            power_factor = user_input[CONF_POWER_FACTOR]
             if type(interval) is not int or interval < MIN_POLL_INTERVAL:
                 errors["base"] = "invalid_interval"
+            elif not 90 <= voltage <= 300:
+                errors["base"] = "invalid_voltage"
+            elif not 0 < power_factor <= 1:
+                errors["base"] = "invalid_power_factor"
             else:
                 return self.async_create_entry(
                     title="", data={**self.config_entry.options, **user_input}
@@ -163,6 +173,18 @@ class MicroAirOptionsFlow(OptionsFlow):
                             CONF_ALLOW_RUNNING, False
                         ),
                     ): bool,
+                    vol.Required(
+                        CONF_NOMINAL_VOLTAGE,
+                        default=self.config_entry.options.get(
+                            CONF_NOMINAL_VOLTAGE, DEFAULT_NOMINAL_VOLTAGE
+                        ),
+                    ): vol.Coerce(float),
+                    vol.Required(
+                        CONF_POWER_FACTOR,
+                        default=self.config_entry.options.get(
+                            CONF_POWER_FACTOR, DEFAULT_POWER_FACTOR
+                        ),
+                    ): vol.Coerce(float),
                 }
             ),
             errors=errors,

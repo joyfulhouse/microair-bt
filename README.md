@@ -41,6 +41,8 @@ locally, without the vendor app.
 
 - Live telemetry **sensors**: status, current, line frequency, last start peak,
   short-cycle delay, learned starts, total starts, total faults
+- Estimated compressor **power** sensor (current x nominal voltage x power
+  factor), with the voltage and power factor configurable in options
 - Diagnostic sensors: model, firmware, startup mask
 - **Fault** and **Powered** (advertising) binary sensors
 - A persistent **Polling** switch to pause all BLE traffic during OEM-app
@@ -96,6 +98,8 @@ EEPROM to confirm a supported model before the entry is created.
 |---|---|---|
 | Minimum polling interval | 30 s | Lower bound between reads (minimum 15 s) |
 | Allow writes while running | off | Permit `set_startup_mode` while the compressor draws current |
+| Nominal line voltage | 240 V | Voltage used for the power estimate (90-300) |
+| Compressor power factor | 0.9 | Power factor used for the power estimate (0-1) |
 
 ## Supported Equipment
 
@@ -111,6 +115,7 @@ they have been verified. Entities are created per device.
 | Current | Compressor current (A) |
 | Line frequency | Mains frequency (Hz) |
 | Last start peak | Peak current of the last start (A) |
+| Power | Estimated compressor real power (W): current x voltage x power factor — compressor only, an estimate |
 | Short cycle delay | Remaining short-cycle protection delay (s) |
 | Learned starts | Starts recorded toward the learned profile |
 | Total starts | Lifetime start counter |
