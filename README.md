@@ -100,6 +100,28 @@ EEPROM to confirm a supported model before the entry is created.
 | Allow writes while running | off | Permit `set_startup_mode` while the compressor draws current |
 | Nominal line voltage | 240 V | Voltage used for the power estimate (90-300) |
 | Compressor power factor | 0.9 | Power factor used for the power estimate (0-1) |
+| Live mode | off | Hold one connection open for near-real-time current (see below) |
+| Live-mode read interval | 5 s | Seconds between reads in live mode (minimum 2 s) |
+
+### Live mode
+
+By default the integration **connects per poll** — it connects, reads, and
+disconnects each cycle, so Home Assistant re-picks the best proxy every time and
+never holds an idle connection. This is the most reliable behaviour on weak
+proxy links and is recommended.
+
+**Live mode** instead holds **one** connection open through a single proxy and
+reads every few seconds, giving near-real-time current like the OEM app. It
+reconnects on its own if the link drops. The trade-offs:
+
+- It **monopolises the unit's Bluetooth**: the OEM app cannot connect, and
+  `set_startup_mode` is rejected until you turn live mode (or the Polling
+  switch) off.
+- On a marginal link a held connection is less resilient than reconnect-per-read;
+  if entities flap, use the default mode or a closer proxy.
+
+Live mode and its interval can be changed at any time in the integration options
+and take effect without a restart.
 
 ## Supported Equipment
 

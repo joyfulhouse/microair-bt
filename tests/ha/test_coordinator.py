@@ -300,3 +300,42 @@ async def test_unchanged_advertisements_keep_polling(
     assert len(ble.clients) == 2
     remove_listener()
     await coordinator.async_shutdown()
+
+
+async def test_live_mode_holds_one_connection_and_streams(
+    hass: HomeAssistant, ble: BluetoothHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    entry = make_entry(live_mode=True, live_interval=2)
+    entry.add_to_hass(hass)
+    coordinator = MicroAirCoordinator(hass, entry)
+
+    # Deterministic, fast cadence: end the held session after two live pushes
+    # instead of waiting on the real interval timer.
+    pushes = 0
+
+    async def fake_sleep(seconds: float) -> None:
+        nonlocal pushes
+        pushes += 1
+        if pushes >= 2:
+            coordinator.stopping = True
+
+    monkeypatch.setattr(coordinator, "_sleep", fake_sleep)
+    # One EEPROM bootstrap read, then two ReadLive reads over the same link.
+    ble.replies = [chunks(EEPROM), chunks(LIVE), chunks(LIVE)]
+    await coordinator.async_start()
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    assert coordinator.data is not None
+    assert coordinator.data.live.current_a == 9.2
+    assert coordinator.data.eeprom is not None
+    assert coordinator.data.eeprom.model == "398ULBT"
+    # A single connection carried the whole session (not connect-per-read).
+    assert len(ble.clients) == 1
+    writes = [payload for _, payload, _ in ble.clients[0].writes]
+    assert writes == [
+        b'{"Cmd": ReadEEP}',
+        b'{"Cmd": ReadLive}',
+        b'{"Cmd": ReadLive}',
+    ]
+    assert not ble.clients[0].is_connected
+    await coordinator.async_shutdown()

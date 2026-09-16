@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-16
+
+### Added
+
+- **Live mode** (opt-in, per device): holds one GATT connection open through a
+  single Bluetooth proxy and reads `ReadLive` on a fast timer (default 5 s,
+  minimum 2 s) for near-real-time compressor current, like the OEM app —
+  instead of the default connect-per-poll. Two new options: **Live mode**
+  (default off) and **Live-mode read interval**. Toggling either takes effect
+  without a restart.
+- Live mode reconnects on its own if the link drops (gated on the unit still
+  advertising) and refreshes the near-static EEPROM image at most hourly, so a
+  dropped frame in the big transfer never blocks live current.
+
+### Changed
+
+- While live mode is active the single BLE central is held open, so the OEM app
+  cannot connect and `set_startup_mode` is **rejected up front** with a message
+  to turn Live mode (or the Polling switch) off first. The default
+  connect-per-poll mode is unchanged and remains recommended for reliability on
+  weak proxy links.
+
 ## [0.3.0] - 2026-09-16
 
 ### Added
@@ -110,7 +132,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   decoded telemetry fields, device identity and OEM relearn procedure, and the
   integration specification.
 
-[Unreleased]: https://github.com/joyfulhouse/microair-bt/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/joyfulhouse/microair-bt/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/joyfulhouse/microair-bt/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/joyfulhouse/microair-bt/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/joyfulhouse/microair-bt/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/joyfulhouse/microair-bt/compare/v0.2.0...v0.2.1

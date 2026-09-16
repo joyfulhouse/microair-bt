@@ -31,15 +31,18 @@
           "poll_interval": "Minimum polling interval (seconds)",
           "allow_running": "Allow explicit startup-mode writes while the compressor is running",
           "nominal_voltage": "Nominal line voltage (V) for the power estimate",
-          "power_factor": "Compressor power factor (0-1) for the power estimate"
+          "power_factor": "Compressor power factor (0-1) for the power estimate",
+          "live_mode": "Live mode: hold one connection open for near-real-time current",
+          "live_interval": "Live-mode read interval (seconds)"
         },
-        "description": "Polling requires advertisements. Turn off the Polling switch to pause all reads and writes during OEM maintenance. The pause survives restarts. The Power sensor estimates compressor-only power as current x voltage x power factor; adjust the voltage and power factor to your system."
+        "description": "Polling requires advertisements. Turn off the Polling switch to pause all reads and writes during OEM maintenance. The pause survives restarts. The Power sensor estimates compressor-only power as current x voltage x power factor; adjust the voltage and power factor to your system. Live mode holds one connection open through a single proxy and reads every few seconds for near-real-time current; it monopolises the unit's Bluetooth (the OEM app and startup-mode writes cannot connect while it is on)."
       }
     },
     "error": {
       "invalid_interval": "The polling interval must be an integer of at least 15 seconds.",
       "invalid_voltage": "Nominal voltage must be between 90 and 300 V.",
-      "invalid_power_factor": "Power factor must be greater than 0 and at most 1."
+      "invalid_power_factor": "Power factor must be greater than 0 and at most 1.",
+      "invalid_live_interval": "The live-mode interval must be an integer of at least 2 seconds."
     }
   }
 }

@@ -29,8 +29,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: MicroAirConfigEntry) -> 
     except BaseException:
         await coordinator.async_shutdown()
         raise
+    # React to option edits (live mode, interval, voltage/PF) without a reload.
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     async_register_services(hass)
     return True
+
+
+async def _async_options_updated(
+    hass: HomeAssistant, entry: MicroAirConfigEntry
+) -> None:
+    entry.runtime_data.async_options_updated()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: MicroAirConfigEntry) -> bool:
