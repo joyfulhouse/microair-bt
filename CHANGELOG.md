@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Verified
+
+- Relearn write path exercised live on `EasyStart_88CD` over the HA proxy
+  mesh (2026-09-21): STORED `0x01`; next power-up reset learned starts and the
+  lifetime start/fault counters to 0 and logged learning start 1. See
+  `wiki/ble-protocol.md` and `docs/claude/research/live-relearn-validation-2026-09-21.md`.
+
 ## [0.5.0] - 2026-09-21
 
 ### Added

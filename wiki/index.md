@@ -18,17 +18,22 @@ from HA.
 | Device located on an HA Bluetooth proxy | ✅ **both units heard and connectable over ESPHome active proxies** (2026-09-11/12) while their A/C is calling. Links are marginal: −75 to −94 dBm depending on which proxy wins ([ha-proxy-coverage](ha-proxy-coverage.md)). Production path is HA's proxy mesh, never an ad-hoc host adapter. |
 | Specification for the integration | ✅ v1.1 — [integration-plan](integration-plan.md); three-vendor /debate REVISE×3 folded in (`docs/claude/research/debate-spec-synthesis.md`); awaiting plan-gate ruling |
 | HA custom integration | ✅ **merged + released** — PR #1 protocol lib/BLE client/probe, PR #2 hardening, PR #3 HA integration (sensors, binary sensors, polling switch, `set_startup_mode`), PR #7 brand assets, PR #8 live-only polling with cached EEPROM, PR #10 power estimate (v0.3.0), PR #11 live mode (v0.4.0); **v0.5.0 (2026-09-21) adds app write-path parity**: startup-mode select (incl. hidden SuperLearn), no-power-up-delay / start-delay switches, SCPT number, seven disabled-by-default fault-protection switches, all through one guarded readback-verified path (`writes.py`). Shipped via HACS custom repository, two config entries loaded in production |
-| Live validation on real device | ✅ **read path verified over the HA proxy path** (2026-09-12, v0.2.2): `EasyStart_88CD` polls `ReadLive` every 30 s and read a complete EEPROM image (`398ULBT` fw 37, mask `0x00`), telemetry consistent (8.5 A, 59.78 Hz, 60 total starts, 6 learned). ⚠️ **Write path still unverified** (now also covers `SCPT` / `FMask`) — see [GitHub #5](https://github.com/joyfulhouse/microair-bt/issues/5). The 2026-09-10 host-adapter `total_starts` 3671-vs-7 inconsistency is explained: there are **two units** (`88CD` upstairs, `DC5A` downstairs) and the probes hit different ones. |
+| Live validation on real device | ✅ **read path verified over the HA proxy path** (2026-09-12, v0.2.2): `EasyStart_88CD` polls `ReadLive` every 30 s and read a complete EEPROM image (`398ULBT` fw 37, mask `0x00`), telemetry consistent (8.5 A, 59.78 Hz, 60 total starts, 6 learned). ✅ **Relearn write verified live over the HA proxy path** (2026-09-21, v0.4.0 service, `EasyStart_88CD`): `SMask=01` acknowledged and read back as `0x01`; on the next power-up the unit reported **Learned Starts 0, Total Starts 0, Total Faults 0, Last Start Peak 0** (from 6 / 229 / 66 / 20.7 A) and logged learning start 1 within 20 s — relearn is a factory reset of learned data *and* lifetime counters. It took 3 attempts over the marginal link (2 preflight `ReadEEP` frame drops → REJECTED, nothing sent; 1 `Success` with a truncated readback → ACKNOWLEDGED-BUT-UNVERIFIED). `SCPT` / `FMask` writes (v0.5.0) are still unverified on hardware. [GitHub #5](https://github.com/joyfulhouse/microair-bt/issues/5) closed. The 2026-09-10 host-adapter `total_starts` 3671-vs-7 inconsistency is explained: there are **two units** (`88CD` upstairs, `DC5A` downstairs) and the probes hit different ones. |
 
 ## The one-paragraph answer
 
 Relearn is a single byte: write ASCII `{"Cmd": SMask=01}` (bit 0 of the
 startup mask at EEPROM buffer index 906) to characteristic `d973f2e2…`, wait
 for a notification containing `Success`, re-read with `{"Cmd": ReadEEP}`. Then
-the **human must power-cycle the A/C**; the next five successful ≥ 30 s
-compressor starts rebuild the profile, visible as `Learned Starts` in the
-`ReadLive` telemetry. There is no clear-faults command; never send anything
-from the firmware-update family.
+the **human must power-cycle the A/C** (end the cooling call; the unit is
+powered only while the A/C calls); at the next power-up the firmware zeroes
+the learned profile **and the lifetime start/fault counters**, and the next
+five successful ≥ 30 s compressor starts rebuild the profile, visible as
+`Learned Starts` in the `ReadLive` telemetry. **Verified live 2026-09-21.**
+Bit 0 stays set through at least the first learning start. The device accepts
+the write while the compressor is running (the OEM app does the same; the
+unit is never powered otherwise). There is no clear-faults command; never send
+anything from the firmware-update family.
 
 ## Pages
 
