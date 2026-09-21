@@ -22,7 +22,7 @@ community C1–C13) and the APK reads cited on [ble-protocol](ble-protocol.md).
 | Concurrency | **only one BLE client at a time** (the OEM app must be closed for HA to connect) | O2 |
 | Power / advertising | powered from the A/C control circuit; community reports it **advertises only while the HVAC is calling** (i.e. while the unit has power) | O2, C2, C3 |
 | Range | short — community recommends a proxy within ~3–6 ft | C3 |
-| Firmware version | EEPROM idx 10 (u8); ≥ 29 unlocks hidden SuperLearn/Start-Delay modes in the app | `J/Relearn.java:353` |
+| Firmware version | EEPROM idx 10 (u8); ≥ 29 unlocks hidden SuperLearn/Start-Delay modes in the app. Both house units run **37**; the OEM currently serves **B38** (see Firmware below) | `J/Relearn.java:353`, [sources](sources.md) |
 
 ## Learning and relearning (OEM semantics)
 
@@ -54,6 +54,32 @@ community C1–C13) and the APK reads cited on [ble-protocol](ble-protocol.md).
   of **Stall** (start attempted but failed). A compressor that makes *no* start
   attempt is more often power/wiring/thermostat. Relearn is "confirmed as
   possible, not proven as the cause" — treat the project hypothesis accordingly.
+
+## Firmware (OEM update channel)
+
+The app checks `http://easystart.microair.net/downloads/registration.txt`
+(per-device gate: any listed version above the unit's own means "update
+available") and then `updates.txt` (one row per model: fuses, lock bits, `.eep`
+and `.hex` filenames) — `J/Update.java:1219-1330,1607`. As of 2026-09-21 the
+Flex row is `398BT,26,0,0,0,E8,398ULBT-B38.eep,398ULBT-B38.hex`, files dated
+2026-09-18; images archived under `sources/firmware/398ULBT-B38/`.
+
+- **B38 factory EEPROM defaults** (decoded from the `.eep`; addresses are
+  buffer idx − 2): model `398ULBT`, fw byte **38**, SMask `0x00`, FMask
+  `0x7F` (all seven protections on), SCPT **3 min** — identical to the defaults
+  observed on both units at firmware 37. Learned-data / log regions are zero.
+- **An update rewrites the whole EEPROM** (`{"Wrt": EEP=…}` after the flash),
+  so it erases the learned profile, lifetime counters and settings: a fresh
+  learn follows every update. Do it before, not during, a relearn.
+- **No changelog exists** for B38 (checked microair.net, micro-air.com support
+  PDFs, app-store version history, owner forums, 2026-09-21). Older images
+  (B35–B37) are no longer served, so no binary diff is possible. The flash
+  image contains no printable strings — the JSON command grammar lives in the
+  Bluetooth module, not the AVR.
+- The app refuses to recommend the update while SMask bit 2 (No Pwr-Up Delay)
+  is set (`J/Update.java:1627`), and the unit must stay powered (A/C calling)
+  for the whole flash. **Updating is an OEM-app action only**; this project's
+  integration cannot emit any update-family command.
 
 ## Fault / LED table (current OEM, Bluetooth models)
 
