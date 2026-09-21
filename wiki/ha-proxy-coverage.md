@@ -68,3 +68,19 @@ still not been captured advertising on an ESPHome proxy. A single `SMask`
 write from that host returned BlueZ `Operation Not Authorized` and readbacks
 never changed; see [index](index.md). Host adapters are a diagnostic tool only:
 the production connection is HA's nearest ESPHome active proxy.
+
+## Write path over the proxy mesh (2026-09-21, `EasyStart_88CD`)
+
+First live write, `set_startup_mode relearn` (v0.4.0), compressor running at
+8 A, live mode temporarily off, `allow_running` temporarily on:
+
+| Attempt | Time | Outcome | Cause |
+|---|---|---|---|
+| 1–2 | 12:07:58, 12:09:31 | REJECTED (nothing sent) | preflight `ReadEEP` 1003 of 1023 bytes — one dropped 20-byte frame |
+| 3 | 12:09:47 | ACKNOWLEDGED-BUT-UNVERIFIED | `SMask=01` → `Success`; readback `ReadEEP` truncated |
+| 4 | 12:10:07 | **STORED** `0x01` | full readback matched |
+
+Same link that dropped frames during live-mode polling minutes earlier
+(`Peripheral disconnected`, GATT error 133, `READ_LIVE exceeded 10s`). The
+service never retries on its own; each attempt above was a separate operator
+call. A closer proxy would remove most of this friction.

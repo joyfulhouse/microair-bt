@@ -109,16 +109,31 @@ reboot command, no automatic power cycle.**
 
 There are no deliberate delays between steps; each waits on the notification.
 
-### What the app does NOT tell us (⚠️ unverified, resolve live)
+### What the app does NOT tell us — resolved live (2026-09-21, `EasyStart_88CD`, fw 37)
 
-- Whether firmware acts on bit 0 immediately or at the next compressor start.
-- Whether bit 0 self-clears after a completed relearn, and how many starts
-  the relearn takes (the Status screen's **Learned Starts** byte is the only
-  progress signal; see [available-data](available-data.md)).
-- Whether a power cycle is needed, and whether the device accepts `SMask`
-  while the compressor is running.
-- Whether a stale learned profile is actually what keeps this compressor from
-  starting (the diagnosis itself is unverified).
+Evidence: `docs/claude/research/live-relearn-validation-2026-09-21.md`; HA
+telemetry via the v0.4.0 integration over an ESPHome proxy.
+
+- **Bit 0 acts at the next power-up, not immediately.** Written while the
+  compressor ran (8 A, status Normal); telemetry stayed Learned Starts 6 /
+  Total Starts 229 / Total Faults 66 for the rest of that cycle.
+- **Relearn is a factory reset of learned data *and* lifetime counters.** At
+  the next power-up the unit reported Learned Starts 0, Total Starts 0, Total
+  Faults 0, Last Start Peak 0.0 A, then Learned Starts 1 / Total Starts 1 /
+  peak 18.5 A about 20 s later (≈ 2 s SCPT delay shown before the start).
+- **Bit 0 does not self-clear after the first learning start** (`0x01` read
+  through 4+ min of the first learning run). ⚠️ Still unknown whether it clears
+  after the fifth start.
+- **A power cycle is required** (ending the cooling call de-powers the unit;
+  HA marks it unpowered ~4.5 min after the last advertisement).
+- **The device accepts `SMask` while the compressor is running** — the write
+  returned `Success` at 8 A. (The OEM app also writes while powered/running.)
+- The diagnosis (stale profile ⇒ no start) remains unverified; the unit had
+  66 lifetime faults before the reset.
+- **Link quality dominates the write path:** 3 attempts were needed — two
+  preflight `ReadEEP` replies were 20 bytes short (one dropped frame ⇒
+  REJECTED, nothing sent) and one write was acknowledged but its readback
+  `ReadEEP` was truncated (ACKNOWLEDGED-BUT-UNVERIFIED); the third verified.
 
 `SMask=00` merely selects "Normal Operation"; it is **not** a factory reset.
 `SMask=11` = ReLearn + SuperLearn (hidden mode).

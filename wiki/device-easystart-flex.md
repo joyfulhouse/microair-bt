@@ -2,9 +2,9 @@
 
 Purpose: what the physical unit is, how it identifies itself over BLE, and how
 Micro-Air says learning / relearning works.
-Status: **partial** — identity facts from the app + OEM manuals; the specific
-unit's address/name is ⚠️ unverified (not yet heard on a proxy, see
-[ha-proxy-coverage](ha-proxy-coverage.md)).
+Status: **partial** — identity facts from the app + OEM manuals; both units
+are heard on proxies ([ha-proxy-coverage](ha-proxy-coverage.md)) and the
+relearn procedure was exercised live on `EasyStart_88CD` (2026-09-21).
 
 Sources: `docs/claude/research/search-easystart-prior-art.md` (OEM manuals O1–O16,
 community C1–C13) and the APK reads cited on [ble-protocol](ble-protocol.md).
@@ -33,6 +33,9 @@ community C1–C13) and the APK reads cited on [ble-protocol](ble-protocol.md).
 - "Relearning is simply restoring EasyStart back to its factory settings, ready
   to learn again." O3. Learned data is retained through ordinary power cycles;
   a power cycle clears a fault *lockout* but does not erase learning. O2, O4–O6.
+  **Verified live 2026-09-21:** "factory settings" includes the lifetime
+  **Total Starts / Total Faults / Last Start Peak** counters, which read 0 at
+  the first power-up after the relearn flag is set ([ble-protocol](ble-protocol.md)).
 - Official Bluetooth relearn procedure (O2 p.9), with the electrical steps
   made explicit:
   1. Unit powered, connect in the app.

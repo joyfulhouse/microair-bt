@@ -32,11 +32,15 @@ locally, without the vendor app.
 > Not affiliated with Micro-Air or the *EasyStart* app.
 
 > **Status:** the protocol is decoded from the OEM app and the HA integration is
-> complete and tested against a fake peripheral. Live reads have been exercised
-> against a real `398ULBT` unit; the **write path (startup mode, SCPT, fault
-> protections) is not yet verified on hardware**. Treat every control entity
-> and `set_startup_mode` as experimental until [`wiki/index.md`](wiki/index.md)
-> marks live validation done.
+> complete and tested against a fake peripheral. Live reads and the **relearn
+> write are verified on a real `398ULBT`** over an ESPHome proxy (2026-09-21:
+> `SMask=01` stored, and at the next power-up the unit reset its learned
+> profile and lifetime counters and logged learning start 1). The SCPT and
+> fault-protection writes added in 0.5.0 are **not yet verified on hardware**;
+> treat those controls as experimental until [`wiki/index.md`](wiki/index.md)
+> says otherwise. Expect REJECTED outcomes on weak proxy links (a dropped frame
+> in the pre-write EEPROM read); a rejected call sends nothing and is safe to
+> repeat.
 
 ## Features
 
