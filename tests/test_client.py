@@ -14,10 +14,15 @@ from custom_components.microair_bt.microair.client import (
     CommandFailed,
     CommandTimeout,
     MicroAirClient,
+    WriteRejected,
+    WriteState,
 )
 from custom_components.microair_bt.microair.protocol import (
     Command,
+    FaultProtection,
     ProtocolError,
+    StartupFlag,
+    StartupMode,
 )
 from tests.conftest import DEVICE, FakeRadio
 from tests.test_protocol import BANNED, eeprom_buffer, live_buffer
@@ -273,55 +278,109 @@ async def test_mask_drops_binary_and_warns(
     ]
     client = MicroAirClient(DEVICE, max_attempts=4)
     async with client.transaction():
-        await client.write_startup_mask(0x01)
+        await client.write_startup_mode(StartupMode.RELEARN)
     assert "binary" in caplog.text.lower()
     assert radio.clients[0].writes == [
         (WRITE_UUID, b'{"Cmd": ReadEEP}', True),
-        (WRITE_UUID, b'{"Cmd": SMask=15}', True),
+        (WRITE_UUID, b'{"Cmd": SMask=05}', True),
     ]
 
 
-@pytest.mark.parametrize("bad", [-1, 32, None, True, "01", b"01", 1.0])
-async def test_mask_rejects_invalid_values_without_sending(
+@pytest.mark.parametrize(
+    "bad", [-1, 0, 1, 0x11, 32, None, True, "relearn", b"01", 1.0, "RELEARN"]
+)
+async def test_mode_rejects_invalid_values_without_sending(
     radio: FakeRadio, bad: object
 ) -> None:
     client = MicroAirClient(DEVICE, max_attempts=4)
     radio.replies = [[live_buffer(), b'{"Sts": Success}']]
     async with client.transaction():
         with pytest.raises((ValueError, TypeError)):
-            await client.write_startup_mask(cast(int, bad))
+            await client.write_startup_mode(cast(StartupMode, bad))
         assert not radio.clients[0].writes
         assert radio.clients[0].is_connected
         assert (await client.read_live()).raw == live_buffer()
     assert radio.clients[0].writes == [(WRITE_UUID, b'{"Cmd": ReadLive}', True)]
 
 
-@pytest.mark.parametrize("mode", [0x03, 0x1D, 0x07])
-async def test_mask_rejects_undefined_modes_before_io(
-    radio: FakeRadio, mode: int
+@pytest.mark.parametrize("bad", [0, 251, 255, 256, -1, None, True, 5.0, "5"])
+async def test_scpt_rejects_invalid_values_before_io(
+    radio: FakeRadio, bad: object
 ) -> None:
-    radio.replies = [
-        [eeprom_buffer(), b'{"Sts": Success}'],
-        [b'{"Sts": Success}'],
-    ]
-    client = MicroAirClient(DEVICE, max_attempts=2)
+    client = MicroAirClient(DEVICE, max_attempts=4)
+    radio.replies = [[eeprom_buffer(), b'{"Sts": Success}']]
     async with client.transaction():
-        with pytest.raises(ValueError, match="Startup mode must be"):
-            await client.write_startup_mask(mode)
+        with pytest.raises(WriteRejected, match="SCPT"):
+            await client.write_scpt(cast(int, bad))
         assert not radio.clients[0].writes
         assert radio.clients[0].is_connected
+        assert client.write_state is WriteState.NOT_ATTEMPTED
 
 
-async def test_public_run_cannot_bypass_mask_entry_point(radio: FakeRadio) -> None:
+@pytest.mark.parametrize(
+    ("flag", "enabled"),
+    [(4, True), ("no_power_up_delay", True), (StartupFlag.NO_POWER_UP_DELAY, 1)],
+)
+async def test_flag_rejects_invalid_values_before_io(
+    radio: FakeRadio, flag: object, enabled: object
+) -> None:
+    client = MicroAirClient(DEVICE, max_attempts=4)
+    async with client.transaction():
+        with pytest.raises((ValueError, TypeError)):
+            await client.write_startup_flag(
+                cast(StartupFlag, flag), cast(bool, enabled)
+            )
+        assert not radio.clients[0].writes
+
+
+@pytest.mark.parametrize(
+    ("protection", "enabled"),
+    [(1, True), ("stall", False), (FaultProtection.OVERCURRENT, 0)],
+)
+async def test_fault_protection_rejects_invalid_values_before_io(
+    radio: FakeRadio, protection: object, enabled: object
+) -> None:
+    client = MicroAirClient(DEVICE, max_attempts=4)
+    async with client.transaction():
+        with pytest.raises((ValueError, TypeError)):
+            await client.write_fault_protection(
+                cast(FaultProtection, protection), cast(bool, enabled)
+            )
+        assert not radio.clients[0].writes
+
+
+@pytest.mark.parametrize(
+    "cmd", [Command.SET_STARTUP_MASK, Command.SET_SCPT, Command.SET_FAULT_MASK]
+)
+async def test_public_run_cannot_bypass_write_entry_points(
+    radio: FakeRadio, cmd: Command
+) -> None:
     client = MicroAirClient(DEVICE, max_attempts=2)
     async with client.transaction():
         with pytest.raises(ValueError):
-            await client.run(Command.SET_STARTUP_MASK, 1, timeout=1)
+            await client.run(cmd, 1, timeout=1)
     assert not radio.clients[0].writes
 
 
 @pytest.mark.parametrize(
-    "token", BANNED + ('{"Cmd": ReadLive}\n', '{"Cmd": SMask=GG}', '{"Cmd": SMask=001}')
+    "token",
+    BANNED
+    + (
+        '{"Cmd": ReadLive}\n',
+        '{"Cmd": SMask=GG}',
+        '{"Cmd": SMask=001}',
+        '{"Cmd": SCPT=0A0}',
+        '{"Cmd": SCPT=a0}',
+        '{"Cmd": FMask=7F }',
+        '{"Cmd": FMask=7}',
+        '{"Cmd":FMask=7F}',
+        '{"Cmd": SMask=20}',
+        '{"Cmd": SMask=FF}',
+        '{"Cmd": SCPT=FB}',
+        '{"Cmd": SCPT=FF}',
+        '{"Cmd": FMask=80}',
+        '{"Cmd": FMask=FF}',
+    ),
 )
 async def test_single_write_site_rejects_banned_payloads(
     radio: FakeRadio, monkeypatch: pytest.MonkeyPatch, token: str
@@ -482,16 +541,16 @@ async def test_mask_requires_fresh_model_match(radio: FakeRadio, model: bytes) -
         # An earlier matching model must not substitute for the fresh bind.
         assert (await client.read_eeprom()).model == "398ULBT"
         if model == b"398ULBT":
-            await client.write_startup_mask(1)
+            await client.write_startup_mode(StartupMode.RELEARN)
         else:
             with pytest.raises(ProtocolError, match="model"):
-                await client.write_startup_mask(1)
+                await client.write_startup_mode(StartupMode.RELEARN)
     expected = [
         (WRITE_UUID, b'{"Cmd": ReadEEP}', True),
         (WRITE_UUID, b'{"Cmd": ReadEEP}', True),
     ]
     if model == b"398ULBT":
-        expected.append((WRITE_UUID, b'{"Cmd": SMask=15}', True))
+        expected.append((WRITE_UUID, b'{"Cmd": SMask=05}', True))
     assert radio.clients[0].writes == expected
     assert len(radio.clients) == 1
 
@@ -503,8 +562,8 @@ async def test_mask_refused_when_eeprom_read_fails(
     radio.replies = [reply]
     client = MicroAirClient(DEVICE, max_attempts=4)
     async with client.transaction():
-        with pytest.raises(ProtocolError):
-            await client.write_startup_mask(1)
+        with pytest.raises(WriteRejected):
+            await client.write_startup_mode(StartupMode.RELEARN)
     assert radio.clients[0].writes == [(WRITE_UUID, b'{"Cmd": ReadEEP}', True)]
     assert not radio.clients[0].is_connected
 
@@ -544,7 +603,7 @@ async def test_truncated_capture_refused(
     async with client.transaction():
         with pytest.raises(ProtocolError, match="length"):
             if write_mask:
-                await client.write_startup_mask(1)
+                await client.write_startup_mode(StartupMode.RELEARN)
             else:
                 await client.read_eeprom()
         assert not radio.clients[0].is_connected
@@ -581,30 +640,187 @@ async def test_mask_refuses_forbidden_original_bits(
     client = MicroAirClient(DEVICE, max_attempts=2)
     async with client.transaction():
         with pytest.raises(ProtocolError, match="[Uu]nsupported.*mask"):
-            await client.write_startup_mask(1)
+            await client.write_startup_mode(StartupMode.RELEARN)
     assert radio.clients[0].writes == [(WRITE_UUID, b'{"Cmd": ReadEEP}', True)]
 
 
 @pytest.mark.parametrize(
     ("original", "requested", "expected"),
     [
-        (0x10, 0, b"10"),
-        (0x10, 1, b"11"),
-        (0x10, 2, b"12"),
-        (0x14, 1, b"15"),
-        (0x1F, 1, b"1D"),
+        (0x10, StartupMode.NORMAL, b"10"),
+        (0x10, StartupMode.RELEARN, b"01"),
+        (0x10, StartupMode.DEFAULT_RAMP, b"12"),
+        (0x14, StartupMode.RELEARN, b"05"),
+        (0x1F, StartupMode.RELEARN, b"0D"),
+        (0x0C, StartupMode.SUPERLEARN, b"1D"),
+        (0x02, StartupMode.SUPERLEARN, b"11"),
     ],
 )
-async def test_mask_preserves_supported_original_bits(
-    radio: FakeRadio, original: int, requested: int, expected: bytes
+async def test_mode_preserves_flag_bits(
+    radio: FakeRadio, original: int, requested: StartupMode, expected: bytes
 ) -> None:
     raw = bytearray(eeprom_buffer())
     raw[906] = original
     radio.replies = [[bytes(raw), b'{"Sts": Success}'], [b'{"Sts": Success}']]
     client = MicroAirClient(DEVICE, max_attempts=2)
     async with client.transaction():
-        await client.write_startup_mask(requested)
+        assert await client.write_startup_mode(requested) == int(expected, 16)
+        assert client.write_state is WriteState.ACKNOWLEDGED
     assert radio.clients[0].writes == [
         (WRITE_UUID, b'{"Cmd": ReadEEP}', True),
         (WRITE_UUID, b'{"Cmd": SMask=' + expected + b"}", True),
     ]
+
+
+@pytest.mark.parametrize(
+    ("original", "flag", "enabled", "expected"),
+    [
+        (0x00, StartupFlag.NO_POWER_UP_DELAY, True, b"04"),
+        (0x15, StartupFlag.NO_POWER_UP_DELAY, False, b"11"),
+        (0x01, StartupFlag.START_DELAY_MODE, True, b"09"),
+        (0x0F, StartupFlag.START_DELAY_MODE, False, b"07"),
+    ],
+)
+async def test_flag_write_keeps_other_bits(
+    radio: FakeRadio, original: int, flag: StartupFlag, enabled: bool, expected: bytes
+) -> None:
+    raw = bytearray(eeprom_buffer())
+    raw[906] = original
+    radio.replies = [[bytes(raw), b'{"Sts": Success}'], [b'{"Sts": Success}']]
+    client = MicroAirClient(DEVICE, max_attempts=2)
+    async with client.transaction():
+        assert await client.write_startup_flag(flag, enabled) == int(expected, 16)
+    assert radio.clients[0].writes == [
+        (WRITE_UUID, b'{"Cmd": ReadEEP}', True),
+        (WRITE_UUID, b'{"Cmd": SMask=' + expected + b"}", True),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("minutes", "expected"), [(1, b"01"), (3, b"03"), (250, b"FA")]
+)
+async def test_scpt_write_after_fresh_preflight(
+    radio: FakeRadio, minutes: int, expected: bytes
+) -> None:
+    radio.replies = [[eeprom_buffer(), b'{"Sts": Success}'], [b'{"Sts": Success}']]
+    client = MicroAirClient(DEVICE, max_attempts=2)
+    async with client.transaction():
+        assert await client.write_scpt(minutes) == minutes
+        assert client.write_state is WriteState.ACKNOWLEDGED
+    assert radio.clients[0].writes == [
+        (WRITE_UUID, b'{"Cmd": ReadEEP}', True),
+        (WRITE_UUID, b'{"Cmd": SCPT=' + expected + b"}", True),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("original", "protection", "enabled", "expected"),
+    [
+        (0x7F, FaultProtection.COMPRESSOR_STALL, False, b"7B"),
+        (0x7B, FaultProtection.COMPRESSOR_STALL, True, b"7F"),
+        (0x40, FaultProtection.UNEXPECTED_CURRENT, True, b"41"),
+    ],
+)
+async def test_fault_protection_write_after_fresh_preflight(
+    radio: FakeRadio,
+    original: int,
+    protection: FaultProtection,
+    enabled: bool,
+    expected: bytes,
+) -> None:
+    raw = bytearray(eeprom_buffer())
+    raw[907] = original
+    radio.replies = [[bytes(raw), b'{"Sts": Success}'], [b'{"Sts": Success}']]
+    client = MicroAirClient(DEVICE, max_attempts=2)
+    async with client.transaction():
+        assert await client.write_fault_protection(protection, enabled) == int(
+            expected, 16
+        )
+        assert client.write_state is WriteState.ACKNOWLEDGED
+    assert radio.clients[0].writes == [
+        (WRITE_UUID, b'{"Cmd": ReadEEP}', True),
+        (WRITE_UUID, b'{"Cmd": FMask=' + expected + b"}", True),
+    ]
+
+
+async def test_fault_protection_never_disables_everything(radio: FakeRadio) -> None:
+    raw = bytearray(eeprom_buffer())
+    raw[907] = 0x04
+    radio.replies = [[bytes(raw), b'{"Sts": Success}'], [b'{"Sts": Success}']]
+    client = MicroAirClient(DEVICE, max_attempts=2)
+    async with client.transaction():
+        with pytest.raises(WriteRejected, match="at least one"):
+            await client.write_fault_protection(FaultProtection.COMPRESSOR_STALL, False)
+        assert client.write_state is WriteState.NOT_ATTEMPTED
+        assert radio.clients[0].is_connected
+    assert radio.clients[0].writes == [(WRITE_UUID, b'{"Cmd": ReadEEP}', True)]
+
+
+@pytest.mark.parametrize("original", [0x80, 0xFF])
+async def test_fault_protection_refuses_unknown_original_bits(
+    radio: FakeRadio, original: int
+) -> None:
+    raw = bytearray(eeprom_buffer())
+    raw[907] = original
+    radio.replies = [[bytes(raw), b'{"Sts": Success}'], [b'{"Sts": Success}']]
+    client = MicroAirClient(DEVICE, max_attempts=2)
+    async with client.transaction():
+        with pytest.raises(WriteRejected, match="[Uu]nsupported.*fault"):
+            await client.write_fault_protection(FaultProtection.COMPRESSOR_STALL, True)
+    assert radio.clients[0].writes == [(WRITE_UUID, b'{"Cmd": ReadEEP}', True)]
+
+
+@pytest.mark.parametrize("model", [b"364ULBT", b"399BT  "])
+async def test_scpt_and_fault_writes_require_control_model(
+    radio: FakeRadio, model: bytes
+) -> None:
+    raw = bytearray(eeprom_buffer())
+    raw[2:9] = model
+    radio.replies = [
+        [bytes(raw), b'{"Sts": Success}'],
+        [bytes(raw), b'{"Sts": Success}'],
+    ]
+    client = MicroAirClient(DEVICE, max_attempts=2)
+    async with client.transaction():
+        with pytest.raises(WriteRejected, match="model"):
+            await client.write_scpt(5)
+        with pytest.raises(WriteRejected, match="model"):
+            await client.write_fault_protection(FaultProtection.OVERCURRENT, True)
+    assert radio.clients[0].writes == [
+        (WRITE_UUID, b'{"Cmd": ReadEEP}', True),
+        (WRITE_UUID, b'{"Cmd": ReadEEP}', True),
+    ]
+
+
+@pytest.mark.parametrize("cmd", ["scpt", "fault"])
+async def test_parameter_write_state_tracks_attempt_and_failure(
+    radio: FakeRadio, cmd: str
+) -> None:
+    radio.replies = [[eeprom_buffer(), b'{"Sts": Success}'], [b'{"Sts": Fail}']]
+    client = MicroAirClient(DEVICE, max_attempts=2)
+    async with client.transaction():
+        with pytest.raises(CommandFailed):
+            if cmd == "scpt":
+                await client.write_scpt(5)
+            else:
+                await client.write_fault_protection(FaultProtection.OVERCURRENT, True)
+        assert client.write_state is WriteState.ATTEMPTED
+    assert len(radio.clients[0].writes) == 2
+
+
+@pytest.mark.parametrize(("firmware", "offered"), [(28, False), (29, True)])
+async def test_superlearn_requires_firmware_29(
+    radio: FakeRadio, firmware: int, offered: bool
+) -> None:
+    raw = bytearray(eeprom_buffer())
+    raw[10] = firmware
+    radio.replies = [[bytes(raw), b'{"Sts": Success}'], [b'{"Sts": Success}']]
+    client = MicroAirClient(DEVICE, max_attempts=2)
+    async with client.transaction():
+        if offered:
+            assert await client.write_startup_mode(StartupMode.SUPERLEARN) == 0x15
+        else:
+            with pytest.raises(WriteRejected, match="SuperLearn"):
+                await client.write_startup_mode(StartupMode.SUPERLEARN)
+            assert client.write_state is WriteState.NOT_ATTEMPTED
+    assert len(radio.clients[0].writes) == (2 if offered else 1)

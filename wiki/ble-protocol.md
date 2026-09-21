@@ -69,9 +69,12 @@ a stray `ProgMode` alone reboots the unit into the programmer. The app also
 notes that a firmware update with SMask bit 2 set may brick the unit
 (`J/Update.java:1627-1637`).
 
-**Protocol-layer rule for the integration:** whitelist exactly `ReadEEP`,
-`ReadLive` and the templated `SMask=HH`; reject every other string and any raw
-binary write to `…f2e2` at the lowest layer, with a test proving it.
+**Protocol-layer rule for the integration:** whitelist exactly the five
+normal-operation strings — `ReadEEP`, `ReadLive` and the templated `SMask=HH`,
+`SCPT=HH`, `FMask=HH` (the latter two never `00`) — and reject every other
+string and any raw binary write to `…f2e2` at the lowest layer, with a test
+proving it. (v0.2–v0.4 whitelisted only the first three; v0.5.0 added `SCPT`
+and `FMask` for app feature parity.)
 
 ## Startup mask (`SMask`, EEP buffer index 906) — the relearn
 
@@ -138,7 +141,8 @@ The "Fault Control" screen is a set of **enables**, not a fault log. Bits
 Set bit = switch checked; polarity "checked = protection enabled" is plausible
 but ⚠️ unverified. **There is no clear-faults / reset-counters / factory-reset
 command anywhere in the app.** `FMask=00` would *disable* all detections, not
-clear history — do not send it. The integration exposes `FMask` read-only.
+clear history — do not send it. Since v0.5.0 the integration exposes each bit
+as a disabled-by-default switch and refuses to clear the last set bit.
 
 ## EEPROM image (`ReadEEP` reply) — known buffer offsets
 

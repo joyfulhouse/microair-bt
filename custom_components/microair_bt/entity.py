@@ -5,6 +5,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import MicroAirCoordinator
+from .microair.protocol import EepromData
 
 
 class MicroAirEntity(CoordinatorEntity[MicroAirCoordinator]):
@@ -29,3 +30,16 @@ class MicroAirEntity(CoordinatorEntity[MicroAirCoordinator]):
             and self.coordinator.polling_enabled
             and self.coordinator.data is not None
         )
+
+    @property
+    def eeprom(self) -> EepromData | None:
+        data = self.coordinator.data
+        return None if data is None else data.eeprom
+
+
+class MicroAirControlEntity(MicroAirEntity):
+    """A setting stored in the EEPROM image; unavailable until one has been read."""
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.eeprom is not None

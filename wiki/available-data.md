@@ -49,8 +49,8 @@ Note this enum is **not** the same numbering as the FMask bits.
 | 2–8 | Model string | ASCII, e.g. `398ULBT` = Flex | device info `model` |
 | 10 | Firmware version | u8 | device info `sw_version` |
 | 906 | Startup mask (SMask) | bitfield, see [ble-protocol](ble-protocol.md) | `binary_sensor` relearn-pending (bit 0); diagnostic `sensor` raw mask |
-| 907 | Fault-enable mask (FMask) | bitfield bits 0–6 | diagnostic `sensor` (read-only) |
-| 908 | SCPT | u8 minutes (1–250) | diagnostic `sensor` (read-only in v1) |
+| 907 | Fault-enable mask (FMask) | bitfield bits 0–6 | diagnostic `sensor` + seven `switch`es (disabled by default, v0.5.0) |
+| 908 | SCPT | u8 minutes (1–250) | `number` (v0.5.0); reads as a start delay when SMask bit 3 is set |
 
 ## Not available over BLE (per the app)
 

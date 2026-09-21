@@ -4,7 +4,9 @@ set_startup_mode:
     Store a startup mode on one EasyStart and check EEPROM readback. Requires
     confirmation, an advertising device, and polling enabled. This does not
     cycle the compressor or confirm that relearning completed. Select either
-    an entry or a device. Writes are never retried automatically.
+    an entry or a device. Writes are never retried automatically. The same
+    write is available as the Startup mode select entity; superlearn is the
+    OEM app's hidden long-press variant of relearn (firmware 29 or newer).
   fields:
     entry:
       name: Entry
@@ -28,6 +30,7 @@ set_startup_mode:
             - normal
             - relearn
             - default_ramp
+            - superlearn
     confirm:
       name: Confirm startup mode change
       description: >-

@@ -3,7 +3,10 @@
 import pytest
 
 from custom_components.microair_bt.microair.client import MicroAirClient
-from custom_components.microair_bt.microair.protocol import ProtocolError
+from custom_components.microair_bt.microair.protocol import (
+    ProtocolError,
+    StartupMode,
+)
 
 from .conftest import EEPROM, UPSTAIRS, BluetoothHarness, chunks
 
@@ -14,7 +17,7 @@ async def test_acknowledged_mask_result(ble: BluetoothHarness) -> None:
     ble.replies = [chunks(bytes(raw)), [b'{"Sts": Success}']]
     client = MicroAirClient(ble.routes[UPSTAIRS], max_attempts=1)
     async with client.transaction():
-        assert await client.write_startup_mask(1) == 0x15
+        assert await client.write_startup_mode(StartupMode.RELEARN) == 0x05
 
 
 @pytest.mark.parametrize("kind", ["model", "bits", "partial", "read_failed"])
@@ -30,6 +33,6 @@ async def test_preflight_has_distinct_error(ble: BluetoothHarness, kind: str) ->
     client = MicroAirClient(ble.routes[UPSTAIRS], max_attempts=1)
     async with client.transaction():
         with pytest.raises(ProtocolError) as caught:
-            await client.write_startup_mask(1)
-        assert type(caught.value).__name__ == "StartupModeRejected"
+            await client.write_startup_mode(StartupMode.RELEARN)
+        assert type(caught.value).__name__ == "WriteRejected"
     assert len(ble.clients[0].writes) == 1

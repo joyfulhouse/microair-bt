@@ -21,16 +21,27 @@ from bleak.exc import BleakError
 from bleak_retry_connector import establish_connection
 
 from .protocol import (
+    FAULT_MASK_MAX,
+    PARAMETER_WRITES,
+    SCPT_MAX,
+    SCPT_MIN,
     Command,
     Completion,
     EepromData,
+    FaultProtection,
     LiveData,
     ProtocolError,
+    StartupFlag,
+    StartupMode,
     build,
+    fault_protection_mask,
+    flag_mask,
     has_unsupported_bits,
     is_completion,
+    mode_mask,
     parse_eeprom,
     parse_live,
+    superlearn_available,
 )
 
 SERVICE_UUID = "d973f2e0-b19e-11e2-9e96-0800200c9a66"
@@ -41,9 +52,17 @@ CONTROL_MODELS = frozenset({"398ULBT"})
 READ_LIVE_TIMEOUT = 10.0
 SERVICE_READ_LIVE_TIMEOUT = 20.0
 READ_EEP_TIMEOUT = 20.0
-STARTUP_MASK_TIMEOUT = 10.0
+PARAMETER_WRITE_TIMEOUT = 10.0
 SETTLE_SECONDS = 0.5
-_WRITE_PATTERN = re.compile(rb'^\{"Cmd": (ReadEEP|ReadLive|SMask=[0-9A-F]{2})\}$')
+# The five strings the OEM app writes outside its firmware-update path, with
+# the app's value ranges enforced here as well as in the builder: SMask 00-1F,
+# SCPT 01-FA (1-250 min; zero is outside the app's range), FMask 01-7F (zero
+# would disable every protection).
+_WRITE_PATTERN = re.compile(
+    rb'^\{"Cmd": (ReadEEP|ReadLive|SMask=[01][0-9A-F]'
+    rb"|SCPT=(0[1-9A-F]|[1-9A-E][0-9A-F]|F[0-9A])"
+    rb"|FMask=(0[1-9A-F]|[1-7][0-9A-F]))\}$"
+)
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -55,12 +74,12 @@ class CommandTimeout(TimeoutError):
     """The entire command, including the GATT write, exceeded its deadline."""
 
 
-class StartupModeRejected(ProtocolError):
-    """Preflight failed; no startup-mask write was attempted."""
+class WriteRejected(ProtocolError):
+    """Validation or preflight failed; no parameter write was attempted."""
 
 
-class StartupWriteState(Enum):
-    """Observed command phase, retained through transport failure and cleanup."""
+class WriteState(Enum):
+    """Observed parameter-write phase, retained through failure and cleanup."""
 
     NOT_ATTEMPTED = "not_attempted"
     ATTEMPTED = "attempted"
@@ -111,7 +130,7 @@ class MicroAirClient:
         self._command: Command | None = None
         self._buffer = bytearray()
         self._frames = 0
-        self.startup_write_state = StartupWriteState.NOT_ATTEMPTED
+        self.write_state = WriteState.NOT_ATTEMPTED
 
     def _connected(self) -> BleakClient:
         if (
@@ -220,8 +239,8 @@ class MicroAirClient:
         if completion is Completion.FAIL:
             self._fail(CommandFailed(f"Command completion: {completion.value}"))
         elif completion is Completion.OK:
-            if self._command is Command.SET_STARTUP_MASK:
-                self.startup_write_state = StartupWriteState.ACKNOWLEDGED
+            if self._command in PARAMETER_WRITES:
+                self.write_state = WriteState.ACKNOWLEDGED
             raw = bytes(self._buffer)
             _LOGGER.debug(
                 "%s complete: %s bytes in %s frames",
@@ -238,9 +257,10 @@ class MicroAirClient:
                 self._fail(error)
             else:
                 pending.set_result(raw)
-        elif self._command is Command.SET_STARTUP_MASK:
+        elif self._command in PARAMETER_WRITES:
             _LOGGER.warning(
-                "Dropped binary notification during startup-mask command (%s bytes)",
+                "Dropped binary notification during %s write (%s bytes)",
+                self._command.value,
                 len(data),
             )
         else:
@@ -254,9 +274,9 @@ class MicroAirClient:
     async def run(
         self, cmd: Command, arg: int | None = None, *, timeout: float
     ) -> bytes:
-        """Run a read; startup-mask commands must use write_startup_mask()."""
-        if cmd is Command.SET_STARTUP_MASK:
-            raise ValueError("Use write_startup_mask for a startup-mask command")
+        """Run a read; parameter writes must use the typed write_* methods."""
+        if cmd in PARAMETER_WRITES:
+            raise ValueError("Parameter writes must use a typed write_* method")
         return await self._run(cmd, arg, timeout=timeout)
 
     async def _run(
@@ -290,8 +310,8 @@ class MicroAirClient:
                     raise AssertionError("Payload violates command whitelist")
 
                 async def write() -> None:
-                    if cmd is Command.SET_STARTUP_MASK:
-                        self.startup_write_state = StartupWriteState.ATTEMPTED
+                    if cmd in PARAMETER_WRITES:
+                        self.write_state = WriteState.ATTEMPTED
                     await client.write_gatt_char(
                         characteristic,
                         payload,
@@ -334,29 +354,88 @@ class MicroAirClient:
     async def read_eeprom(self, *, timeout: float = READ_EEP_TIMEOUT) -> EepromData:
         return parse_eeprom(await self.run(Command.READ_EEP, timeout=timeout))
 
-    async def write_startup_mask(self, mask: int) -> int:
-        """Accept only modes 0, 1 or 2 and preserve fresh EEPROM bits 2–4.
+    async def _preflight(self) -> EepromData:
+        """Bind to a fresh EEPROM image from a control model within this transaction.
 
-        The transaction already verified the ST triplet. Its lock covers this
-        fresh read and the write. Reject invalid modes before any device I/O.
-        Return the acknowledged mask for the caller's storage readback. An
-        acknowledgement alone does not prove that learning has completed.
+        The transaction already verified the ST triplet; its lock covers this
+        read and the write that follows. Both mask bytes must contain only bits
+        the OEM app understands, so a write can never carry unknown bits along.
         """
-        self.startup_write_state = StartupWriteState.NOT_ATTEMPTED
-        if type(mask) is not int or mask not in (0x00, 0x01, 0x02):
-            raise StartupModeRejected(
-                "Startup mode must be 0 (normal), 1 (relearn) or 2 (ramp)"
-            )
         try:
             eeprom = await self.read_eeprom()
         except (ProtocolError, BleakError, OSError) as error:
-            raise StartupModeRejected(f"EEPROM preflight failed: {error}") from error
+            raise WriteRejected(f"EEPROM preflight failed: {error}") from error
         if eeprom.model not in CONTROL_MODELS:
-            raise StartupModeRejected(f"Unsupported control model: {eeprom.model}")
+            raise WriteRejected(f"Unsupported control model: {eeprom.model}")
         if has_unsupported_bits(eeprom.startup_mask):
-            raise StartupModeRejected(
+            raise WriteRejected(
                 f"Unsupported original startup mask: 0x{eeprom.startup_mask:02X}"
             )
-        mask = (eeprom.startup_mask & 0x1C) | mask
-        await self._run(Command.SET_STARTUP_MASK, mask, timeout=STARTUP_MASK_TIMEOUT)
-        return mask
+        if eeprom.fault_mask > FAULT_MASK_MAX:
+            raise WriteRejected(
+                f"Unsupported original fault mask: 0x{eeprom.fault_mask:02X}"
+            )
+        return eeprom
+
+    async def _write_parameter(self, cmd: Command, value: int) -> int:
+        """Send one parameter write; the caller has validated and preflighted.
+
+        Return the acknowledged value for the caller's storage readback. An
+        acknowledgement alone does not prove that the device acted on it.
+        """
+        try:
+            payload = build(cmd, value)
+        except ValueError as error:
+            raise WriteRejected(str(error)) from error
+        _LOGGER.debug("Writing %s", payload)
+        await self._run(cmd, value, timeout=PARAMETER_WRITE_TIMEOUT)
+        return value
+
+    async def write_startup_mode(self, mode: StartupMode) -> int:
+        """Store a startup mode, keeping the flag bits 2-3 of the fresh image.
+
+        Reject anything but a StartupMode member before any device I/O.
+        """
+        self.write_state = WriteState.NOT_ATTEMPTED
+        if not isinstance(mode, StartupMode):
+            raise WriteRejected("Startup mode must be a StartupMode member")
+        eeprom = await self._preflight()
+        if mode is StartupMode.SUPERLEARN and not superlearn_available(eeprom.firmware):
+            raise WriteRejected(
+                f"SuperLearn is not offered for firmware {eeprom.firmware}"
+            )
+        mask = mode_mask(eeprom.startup_mask, mode)
+        return await self._write_parameter(Command.SET_STARTUP_MASK, mask)
+
+    async def write_startup_flag(self, flag: StartupFlag, enabled: bool) -> int:
+        """Set or clear one independent startup-mask flag bit."""
+        self.write_state = WriteState.NOT_ATTEMPTED
+        if not isinstance(flag, StartupFlag) or type(enabled) is not bool:
+            raise WriteRejected("Startup flag must be a StartupFlag member and bool")
+        eeprom = await self._preflight()
+        mask = flag_mask(eeprom.startup_mask, flag, enabled)
+        return await self._write_parameter(Command.SET_STARTUP_MASK, mask)
+
+    async def write_scpt(self, minutes: int) -> int:
+        """Store the short-cycle protection timer (or start delay) in minutes."""
+        self.write_state = WriteState.NOT_ATTEMPTED
+        if type(minutes) is not int or not SCPT_MIN <= minutes <= SCPT_MAX:
+            raise WriteRejected(f"SCPT must be an integer in {SCPT_MIN}..{SCPT_MAX}")
+        await self._preflight()
+        return await self._write_parameter(Command.SET_SCPT, minutes)
+
+    async def write_fault_protection(
+        self, protection: FaultProtection, enabled: bool
+    ) -> int:
+        """Enable or disable one fault detection; never disable all of them."""
+        self.write_state = WriteState.NOT_ATTEMPTED
+        if not isinstance(protection, FaultProtection) or type(enabled) is not bool:
+            raise WriteRejected(
+                "Fault protection must be a FaultProtection member and bool"
+            )
+        eeprom = await self._preflight()
+        try:
+            mask = fault_protection_mask(eeprom.fault_mask, protection, enabled)
+        except ValueError as error:
+            raise WriteRejected(str(error)) from error
+        return await self._write_parameter(Command.SET_FAULT_MASK, mask)

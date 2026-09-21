@@ -7,17 +7,26 @@ from typing import cast
 import pytest
 
 from custom_components.microair_bt.microair.protocol import (
+    FAULT_MASK_MAX,
+    SCPT_MAX,
+    SCPT_MIN,
     Command,
     Completion,
+    FaultProtection,
     ProtocolError,
+    StartupFlag,
     StartupMode,
     StatusCode,
     build,
+    fault_protection_mask,
+    flag_mask,
     has_unsupported_bits,
     is_completion,
+    mode_from_mask,
     mode_mask,
     parse_eeprom,
     parse_live,
+    superlearn_available,
 )
 
 BANNED = (
@@ -51,6 +60,9 @@ BANNED = (
         (Command.READ_EEP, None, "7B22436D64223A20526561644545507D"),
         (Command.READ_LIVE, None, "7B22436D64223A20526561644C6976657D"),
         (Command.SET_STARTUP_MASK, 1, "7B22436D64223A20534D61736B3D30317D"),
+        (Command.SET_SCPT, 1, "7B22436D64223A20534350543D30317D"),
+        (Command.SET_SCPT, 250, "7B22436D64223A20534350543D46417D"),
+        (Command.SET_FAULT_MASK, 0x7F, "7B22436D64223A20464D61736B3D37467D"),
     ],
 )
 def test_exact_bytes(cmd: Command, arg: int | None, hex_value: str) -> None:
@@ -62,16 +74,38 @@ def test_whitelist_is_exhaustive() -> None:
         "READ_EEP",
         "READ_LIVE",
         "SET_STARTUP_MASK",
+        "SET_SCPT",
+        "SET_FAULT_MASK",
     }
     outputs = {build(Command.READ_EEP), build(Command.READ_LIVE)}
     outputs.update(build(Command.SET_STARTUP_MASK, mask) for mask in range(32))
-    assert len(outputs) == 34
+    outputs.update(
+        build(Command.SET_SCPT, minutes) for minutes in range(SCPT_MIN, SCPT_MAX + 1)
+    )
+    outputs.update(
+        build(Command.SET_FAULT_MASK, mask) for mask in range(1, FAULT_MASK_MAX + 1)
+    )
+    assert len(outputs) == 2 + 32 + 250 + 127
     assert not outputs.intersection(token.encode() for token in BANNED)
     for mask in range(32):
         assert (
             build(Command.SET_STARTUP_MASK, mask)
             == ('{"Cmd": SMask=' + f"{mask:02X}" + "}").encode()
         )
+    assert all(16 <= len(payload) <= 17 for payload in outputs)
+
+
+@pytest.mark.parametrize("arg", [None, 0, 251, 255, 256, True, 1.0, "5", b"5"])
+def test_invalid_scpt(arg: object) -> None:
+    with pytest.raises((TypeError, ValueError)):
+        build(Command.SET_SCPT, cast(int, arg))
+
+
+@pytest.mark.parametrize("arg", [None, 0, 0x80, 0xFF, 256, True, 1.0, "7F"])
+def test_invalid_fault_mask(arg: object) -> None:
+    # Zero would disable every protection; it is refused at the lowest layer.
+    with pytest.raises((TypeError, ValueError)):
+        build(Command.SET_FAULT_MASK, cast(int, arg))
 
 
 @pytest.mark.parametrize("token", BANNED)
@@ -102,12 +136,101 @@ def test_reads_reject_arguments(cmd: Command, arg: object) -> None:
         (0, StartupMode.DEFAULT_RAMP, 2),
         (0, StartupMode.NORMAL, 0),
         (2, StartupMode.RELEARN, 1),
-        (0x14, StartupMode.RELEARN, 0x15),
-        (0x1F, StartupMode.RELEARN, 0x1D),
+        (0x14, StartupMode.RELEARN, 0x05),
+        (0x1F, StartupMode.RELEARN, 0x0D),
+        (0x10, StartupMode.NORMAL, 0x10),
+        (0x14, StartupMode.NORMAL, 0x14),
+        (0x12, StartupMode.DEFAULT_RAMP, 0x12),
+        (0x11, StartupMode.DEFAULT_RAMP, 0x12),
+        (0x0C, StartupMode.SUPERLEARN, 0x1D),
+        (0x03, StartupMode.SUPERLEARN, 0x11),
     ],
 )
 def test_mode_mask(current: int, mode: StartupMode, expected: int) -> None:
+    # Bits 2-3 (flags) are preserved; bits 0-1 belong to the mode. The
+    # SuperLearn label bit 4 persists except when plain relearn is chosen.
     assert mode_mask(current, mode) == expected
+
+
+@pytest.mark.parametrize(("firmware", "offered"), [(28, False), (29, True), (37, True)])
+def test_superlearn_available(firmware: int, offered: bool) -> None:
+    assert superlearn_available(firmware) is offered
+
+
+def test_superlearn_available_rejects_non_int() -> None:
+    with pytest.raises((TypeError, ValueError)):
+        superlearn_available(cast(int, "37"))
+
+
+@pytest.mark.parametrize(
+    ("mask", "mode"),
+    [
+        (0x00, StartupMode.NORMAL),
+        (0x01, StartupMode.RELEARN),
+        (0x02, StartupMode.DEFAULT_RAMP),
+        (0x11, StartupMode.SUPERLEARN),
+        (0x10, StartupMode.NORMAL),
+        (0x15, StartupMode.SUPERLEARN),
+        (0x05, StartupMode.RELEARN),
+        (0x03, StartupMode.RELEARN),
+        (0x0E, StartupMode.DEFAULT_RAMP),
+        (0x12, StartupMode.DEFAULT_RAMP),
+    ],
+)
+def test_mode_from_mask(mask: int, mode: StartupMode) -> None:
+    assert mode_from_mask(mask) is mode
+
+
+@pytest.mark.parametrize(
+    ("current", "flag", "enabled", "expected"),
+    [
+        (0x00, StartupFlag.NO_POWER_UP_DELAY, True, 0x04),
+        (0x15, StartupFlag.NO_POWER_UP_DELAY, False, 0x11),
+        (0x01, StartupFlag.START_DELAY_MODE, True, 0x09),
+        (0x0F, StartupFlag.START_DELAY_MODE, False, 0x07),
+        (0x04, StartupFlag.NO_POWER_UP_DELAY, True, 0x04),
+    ],
+)
+def test_flag_mask(
+    current: int, flag: StartupFlag, enabled: bool, expected: int
+) -> None:
+    assert flag_mask(current, flag, enabled) == expected
+
+
+def test_startup_flags_are_the_app_bits() -> None:
+    assert int(StartupFlag.NO_POWER_UP_DELAY) == 0x04
+    assert int(StartupFlag.START_DELAY_MODE) == 0x08
+    assert [int(bit) for bit in FaultProtection] == [1, 2, 4, 8, 16, 32, 64]
+
+
+@pytest.mark.parametrize(
+    ("current", "bit", "enabled", "expected"),
+    [
+        (0x7F, FaultProtection.COMPRESSOR_STALL, False, 0x7B),
+        (0x7B, FaultProtection.COMPRESSOR_STALL, True, 0x7F),
+        (0x01, FaultProtection.UNEXPECTED_CURRENT, True, 0x01),
+        (0x41, FaultProtection.WIRING_ISSUE, False, 0x01),
+    ],
+)
+def test_fault_protection_mask(
+    current: int, bit: FaultProtection, enabled: bool, expected: int
+) -> None:
+    assert fault_protection_mask(current, bit, enabled) == expected
+
+
+def test_fault_protection_mask_refuses_disabling_everything() -> None:
+    with pytest.raises(ValueError, match="at least one"):
+        fault_protection_mask(0x01, FaultProtection.UNEXPECTED_CURRENT, False)
+
+
+@pytest.mark.parametrize("bad", [-1, 256, True, "7F"])
+def test_fault_protection_mask_rejects_bad_current(bad: object) -> None:
+    with pytest.raises((TypeError, ValueError)):
+        fault_protection_mask(cast(int, bad), FaultProtection.OVERCURRENT, True)
+    with pytest.raises((TypeError, ValueError)):
+        flag_mask(cast(int, bad), StartupFlag.NO_POWER_UP_DELAY, True)
+    with pytest.raises((TypeError, ValueError)):
+        mode_from_mask(cast(int, bad))
 
 
 @pytest.mark.parametrize("mask", range(256))

@@ -8,7 +8,7 @@ from HA.
 
 > Read [SCHEMA](SCHEMA.md) first if you're going to edit the wiki.
 
-## Effort status (2026-09-11)
+## Effort status (2026-09-21)
 
 | Workstream | State |
 |---|---|
@@ -17,8 +17,8 @@ from HA.
 | Public documentation / prior art collected | ✅ done — OEM relearn procedure + community ESPHome read path ([device-easystart-flex](device-easystart-flex.md)) |
 | Device located on an HA Bluetooth proxy | ✅ **both units heard and connectable over ESPHome active proxies** (2026-09-11/12) while their A/C is calling. Links are marginal: −75 to −94 dBm depending on which proxy wins ([ha-proxy-coverage](ha-proxy-coverage.md)). Production path is HA's proxy mesh, never an ad-hoc host adapter. |
 | Specification for the integration | ✅ v1.1 — [integration-plan](integration-plan.md); three-vendor /debate REVISE×3 folded in (`docs/claude/research/debate-spec-synthesis.md`); awaiting plan-gate ruling |
-| HA custom integration | ✅ **merged + released** — PR #1 protocol lib/BLE client/probe, PR #2 hardening, PR #3 HA integration (sensors, binary sensors, polling switch, `set_startup_mode`), PR #7 brand assets, PR #8 live-only polling with cached EEPROM; shipped as **v0.2.2** via HACS custom repository, two config entries loaded in production |
-| Live validation on real device | ✅ **read path verified over the HA proxy path** (2026-09-12, v0.2.2): `EasyStart_88CD` polls `ReadLive` every 30 s and read a complete EEPROM image (`398ULBT` fw 37, mask `0x00`), telemetry consistent (8.5 A, 59.78 Hz, 60 total starts, 6 learned). ⚠️ **Write path still unverified** — see [GitHub #5](https://github.com/joyfulhouse/microair-bt/issues/5). The 2026-09-10 host-adapter `total_starts` 3671-vs-7 inconsistency is explained: there are **two units** (`88CD` upstairs, `DC5A` downstairs) and the probes hit different ones. |
+| HA custom integration | ✅ **merged + released** — PR #1 protocol lib/BLE client/probe, PR #2 hardening, PR #3 HA integration (sensors, binary sensors, polling switch, `set_startup_mode`), PR #7 brand assets, PR #8 live-only polling with cached EEPROM, PR #10 power estimate (v0.3.0), PR #11 live mode (v0.4.0); **v0.5.0 (2026-09-21) adds app write-path parity**: startup-mode select (incl. hidden SuperLearn), no-power-up-delay / start-delay switches, SCPT number, seven disabled-by-default fault-protection switches, all through one guarded readback-verified path (`writes.py`). Shipped via HACS custom repository, two config entries loaded in production |
+| Live validation on real device | ✅ **read path verified over the HA proxy path** (2026-09-12, v0.2.2): `EasyStart_88CD` polls `ReadLive` every 30 s and read a complete EEPROM image (`398ULBT` fw 37, mask `0x00`), telemetry consistent (8.5 A, 59.78 Hz, 60 total starts, 6 learned). ⚠️ **Write path still unverified** (now also covers `SCPT` / `FMask`) — see [GitHub #5](https://github.com/joyfulhouse/microair-bt/issues/5). The 2026-09-10 host-adapter `total_starts` 3671-vs-7 inconsistency is explained: there are **two units** (`88CD` upstairs, `DC5A` downstairs) and the probes hit different ones. |
 
 ## The one-paragraph answer
 

@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-21
+
+### Added
+
+- **Feature parity with the OEM app's write path.** The EasyStart app can write
+  exactly three parameters outside its firmware-update family: the startup
+  mask (`SMask`), the short-cycle protection timer (`SCPT`) and the
+  fault-enable mask (`FMask`). All three are now controllable from Home
+  Assistant, through one shared guarded write path (live-status running
+  guard, fresh EEPROM preflight, single write, EEPROM readback verification,
+  persistent notification).
+- **Startup mode** select entity (configuration): `normal`, `relearn`,
+  `default_ramp`, plus `superlearn` (the app's hidden long-press variant of
+  relearn) when the unit's firmware is 29 or newer. Selecting `relearn` sends
+  the same relearn instruction as the `set_startup_mode` service and posts the
+  OEM power-cycle / five-start procedure. **Disabled by default** until the
+  write path is verified live: enabling the entity is the operator's explicit
+  confirmation (the service keeps its `confirm: true` flag).
+- **No power-up delay** switch (startup-mask bit 2) and, disabled by default,
+  the hidden **Start delay mode** switch (bit 3, which makes the SCPT byte a
+  start delay in the app).
+- **Short-cycle protection timer** number entity (1-250 min, whole minutes),
+  with an `interpretation` attribute that reports `start_delay` when the hidden
+  mode is set.
+- Seven **fault protection** switches (unexpected current, power interruption,
+  compressor stall, start hardware failed, open overload, overcurrent, wiring
+  issue). They are **disabled by default** in the entity registry, standing in
+  for the app's confirm dialog: enable them deliberately before use. The
+  integration refuses to disable the last enabled protection.
+- **Fault mask** diagnostic sensor; the **Startup mask** and **Fault mask**
+  sensors now expose their decoded bits as attributes.
+- `set_startup_mode` service accepts `superlearn`.
+
+### Changed
+
+- The protocol whitelist grows from three to five command strings
+  (`SCPT=HH` and `FMask=HH`); `SCPT=00` and `FMask=00` remain banned at both
+  the builder and the single GATT write site. The 19 firmware-update commands
+  stay structurally impossible to send.
+- Startup-mode arithmetic follows the app's SuperLearn label bit 4: it
+  persists through `normal` and `default_ramp`, is set by `superlearn`, and is
+  cleared only by choosing plain `relearn` deliberately. Bits 2-3 (the flag
+  switches) are preserved across every mode change. `superlearn` is refused
+  for firmware below 29 at the client, so no surface can bypass the gate.
+- Write notifications carry guidance specific to what was stored (the relearn
+  procedure only for `relearn` / `superlearn`; a reminder for `default_ramp`
+  and for a disabled protection).
+- Client write API: `write_startup_mode`, `write_startup_flag`, `write_scpt`,
+  `write_fault_protection`; `WriteRejected` / `WriteState` replace the
+  startup-mask-specific names.
+
 ## [0.4.0] - 2026-09-16
 
 ### Added

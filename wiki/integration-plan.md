@@ -34,6 +34,12 @@ are refused); automatic retries, automatic relearns or automatic power
 cycling; any claim that relearn diagnoses *why* a compressor does not start;
 authentication of the peripheral (the link has none — see §10).
 
+> **Superseded (v0.5.0, 2026-09-21):** the operator asked for feature parity
+> with the OEM app's write path, so `SCPT` and `FMask` writes, the hidden
+> SuperLearn / Start-Delay modes (bits 3–4; bits 5–7 are still refused), and
+> control entities (select / number / switch — still no button) are in scope.
+> The remaining non-goals stand. See `writes.py` for the single guarded path.
+
 ## 2. Delivery: two PRs, one implementer
 
 **PR-1 — protocol foundation (no Home Assistant imports).**
@@ -193,10 +199,13 @@ EEPROM (`398ULBT` → "EasyStart Flex"), `sw_version` = firmware byte.
 | `binary_sensor.relearn_request_flag` (diag) | SMask bit 0 | — | the *saved setting*, not progress; attrs: `sample_time`, last request (§9) |
 | `binary_sensor.default_ramp` (diag) | SMask bit 1 | problem | so it is not left on |
 | `sensor.startup_mask` (diag) | EEP 906 | hex | attrs: decoded bits 0–4 |
-| `sensor.fault_mask` (diag) | EEP 907 | hex | read-only |
-| `sensor.scpt` (diag) | EEP 908 | duration, min | read-only |
+| `sensor.fault_mask` (diag) | EEP 907 | hex | attrs: decoded bits 0–6 |
 | `sensor.rssi` (diag) | HA bluetooth | dBm | |
 | `switch.polling` | coordinator | — | §7 |
+| `select.startup_mode` (config, v0.5.0) | SMask bits 0/1/4 | normal / relearn / default_ramp / superlearn (fw ≥ 29, enforced in the client) | disabled by default (learn command, write path unverified); same guarded path as §9 |
+| `switch.no_power_up_delay`, `switch.start_delay_mode` (config, v0.5.0) | SMask bits 2 / 3 | — | bit 3 disabled by default (hidden app mode) |
+| `number.scpt_minutes` (config, v0.5.0) | EEP 908 | duration, min, 1–250 | attr `interpretation` |
+| `switch.protect_*` ×7 (config, v0.5.0) | FMask bits 0–6 | — | disabled by default; last set bit cannot be cleared |
 
 No button entity.
 
