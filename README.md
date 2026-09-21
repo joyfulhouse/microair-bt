@@ -33,9 +33,10 @@ locally, without the vendor app.
 
 > **Status:** the protocol is decoded from the OEM app and the HA integration is
 > complete and tested against a fake peripheral. Live reads have been exercised
-> against a real `398ULBT` unit; the **startup-mode write path is not yet
-> verified on hardware**. Treat `set_startup_mode` as experimental until
-> [`wiki/index.md`](wiki/index.md) marks live validation done.
+> against a real `398ULBT` unit; the **write path (startup mode, SCPT, fault
+> protections) is not yet verified on hardware**. Treat every control entity
+> and `set_startup_mode` as experimental until [`wiki/index.md`](wiki/index.md)
+> marks live validation done.
 
 ## Features
 
@@ -43,12 +44,19 @@ locally, without the vendor app.
   short-cycle delay, learned starts, total starts, total faults
 - Estimated compressor **power** sensor (current x nominal voltage x power
   factor), with the voltage and power factor configurable in options
-- Diagnostic sensors: model, firmware, startup mask
+- Diagnostic sensors: model, firmware, startup mask, fault mask (with decoded
+  bits as attributes)
 - **Fault** and **Powered** (advertising) binary sensors
 - A persistent **Polling** switch to pause all BLE traffic during OEM-app
   maintenance (survives restarts)
-- `microair_bt.set_startup_mode` **service** to store `normal`, `relearn` or
-  `default_ramp` with EEPROM readback verification and an operator notification
+- **Feature parity with the OEM app's write path**: a **Startup mode** select
+  (normal / relearn / default ramp / SuperLearn), **No power-up delay** and
+  **Start delay mode** switches, a **Short-cycle protection timer** number, and
+  seven **fault protection** switches — every write goes through one guarded,
+  readback-verified path
+- `microair_bt.set_startup_mode` **service** to store `normal`, `relearn`,
+  `default_ramp` or `superlearn` with EEPROM readback verification and an
+  operator notification
 - Bluetooth **auto-discovery** (`EasyStart_*` local name) and manual add by
   address
 - Multi-device: one config entry per EasyStart
@@ -97,7 +105,7 @@ EEPROM to confirm a supported model before the entry is created.
 | Option | Default | Description |
 |---|---|---|
 | Minimum polling interval | 30 s | Lower bound between reads (minimum 15 s) |
-| Allow writes while running | off | Permit `set_startup_mode` while the compressor draws current |
+| Allow writes while running | off | Permit any write (service or control entity) while the compressor draws current |
 | Nominal line voltage | 240 V | Voltage used for the power estimate (90-300) |
 | Compressor power factor | 0.9 | Power factor used for the power estimate (0-1) |
 | Live mode | off | Hold one connection open for near-real-time current (see below) |
@@ -142,7 +150,7 @@ they have been verified. Entities are created per device.
 | Learned starts | Starts recorded toward the learned profile |
 | Total starts | Lifetime start counter |
 | Total faults | Lifetime fault counter |
-| Model / Firmware / Startup mask | Diagnostic |
+| Model / Firmware / Startup mask / Fault mask | Diagnostic; the two masks expose their decoded bits as attributes |
 
 ### Binary Sensors
 
@@ -151,11 +159,23 @@ they have been verified. Entities are created per device.
 | Powered | The unit is advertising (A/C is supplying it power) |
 | Fault | Status is a fault code (not `normal` or `short_cycle_delay`) |
 
-### Switches
+### Controls
 
-| Entity | Description |
-|---|---|
-| Polling | Pause/resume all BLE reads and writes (configuration entity) |
+Every control below is a **configuration** entity that writes to the EasyStart's
+EEPROM through the same guarded path as the service: it reads live status first
+(refusing while the compressor runs unless the option above is enabled), reads
+a fresh EEPROM image, writes once, re-reads the EEPROM and reports `STORED` only
+when the readback matches. Controls are unavailable until an EEPROM image has
+been read and while **Live mode** holds the connection.
+
+| Entity | Type | Description |
+|---|---|---|
+| Polling | switch | Pause/resume all BLE reads and writes; available even while unpowered |
+| Startup mode | select | *Disabled by default* until the write path is verified live (enabling it is your explicit confirmation). `normal`, `relearn`, `default_ramp`; `superlearn` (the app's hidden long-press variant of relearn) appears for firmware 29+. Selecting `relearn` sends the relearn instruction and posts the OEM power-cycle procedure |
+| No power-up delay | switch | Startup-mask bit 2, the app's "No Pwr-Up Delay" |
+| Start delay mode | switch | *Disabled by default.* Hidden app mode (bit 3) that turns the SCPT byte into a start delay |
+| Short-cycle protection timer | number | SCPT, 1-250 whole minutes; attribute `interpretation` reports `start_delay` when the hidden mode is set |
+| Unexpected current / Power interruption / Compressor stall / Start hardware failed / Open overload / Overcurrent / Wiring issue protection | switch | *Disabled by default.* The app's Fault Control enables. Turning one **off stops the EasyStart from detecting that fault**; enable these entities deliberately (they stand in for the app's confirm dialog). The last enabled protection cannot be turned off |
 
 ### Services
 
@@ -164,7 +184,7 @@ they have been verified. Entities are created per device.
 | Field | Description |
 |---|---|
 | `entry` or `device` | Exactly one target |
-| `mode` | `normal`, `relearn` or `default_ramp` |
+| `mode` | `normal`, `relearn`, `default_ramp` or `superlearn` |
 | `confirm` | Must be `true` |
 
 The service reads live status first, refuses to write while the compressor is
@@ -204,6 +224,16 @@ script:
           confirm: true
 ```
 
+The same write is one tap away as the **Startup mode** select entity:
+
+```yaml
+      - service: select.select_option
+        target:
+          entity_id: select.easystart_88cd_startup_mode
+        data:
+          option: relearn
+```
+
 **Lovelace card:**
 
 ```yaml
@@ -215,6 +245,9 @@ entities:
   - entity: sensor.easystart_88cd_learned_starts
   - entity: binary_sensor.easystart_88cd_powered
   - entity: switch.easystart_88cd_polling
+  - entity: select.easystart_88cd_startup_mode
+  - entity: number.easystart_88cd_short_cycle_protection_timer
+  - entity: switch.easystart_88cd_no_power_up_delay
 ```
 
 ## Troubleshooting
@@ -235,11 +268,18 @@ entities:
 - On a failed read the integration backs off (up to 5 min) and holds the error
   until the next successful poll.
 
-**`set_startup_mode` returns REJECTED / INDETERMINATE**
+**A write (service or control entity) returns REJECTED / INDETERMINATE**
 - `REJECTED` means nothing was written (not advertising, compressor running,
-  unsupported model, polling paused). `INDETERMINATE` or
-  `ACKNOWLEDGED-BUT-UNVERIFIED` means a write may have landed but the readback
-  failed — inspect the **Startup mask** sensor before sending another command.
+  unsupported model, polling paused, live mode on, or a value the device does
+  not accept). `INDETERMINATE` or `ACKNOWLEDGED-BUT-UNVERIFIED` means a write
+  may have landed but the readback failed — the affected entities go
+  unavailable until the next successful poll; inspect the **Startup mask** /
+  **Fault mask** sensors before sending another command.
+
+**The Startup mode select or the fault protection switches are missing**
+- They are created disabled. Enable them from the device page (entity
+  settings) and reload the entry; this deliberate step replaces the OEM app's
+  confirm dialog and the service's `confirm` flag.
 
 **Debug logging:**
 

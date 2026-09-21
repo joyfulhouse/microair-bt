@@ -44,5 +44,17 @@
       "invalid_power_factor": "Power factor must be greater than 0 and at most 1.",
       "invalid_live_interval": "The live-mode interval must be an integer of at least 2 seconds."
     }
+  },
+  "entity": {
+    "select": {
+      "startup_mode": {
+        "state": {
+          "normal": "Normal operation",
+          "relearn": "Relearn",
+          "default_ramp": "Use default ramp",
+          "superlearn": "SuperLearn (hidden OEM mode)"
+        }
+      }
+    }
   }
 }

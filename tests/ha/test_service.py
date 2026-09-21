@@ -30,7 +30,13 @@ async def call(
 
 
 @pytest.mark.parametrize(
-    ("mode", "mask"), [("normal", 0x14), ("relearn", 0x15), ("default_ramp", 0x16)]
+    ("mode", "mask"),
+    [
+        ("normal", 0x14),
+        ("relearn", 0x05),
+        ("default_ramp", 0x16),
+        ("superlearn", 0x15),
+    ],
 )
 async def test_modes_readback_and_notification(
     hass: HomeAssistant,
@@ -62,10 +68,17 @@ async def test_modes_readback_and_notification(
     coordinator: MicroAirCoordinator = loaded.runtime_data
     assert coordinator.data is not None and coordinator.data.eeprom is not None
     assert coordinator.data.eeprom.startup_mask == mask
-    notifications = hass.data["persistent_notification"]
-    text = str(notifications)
-    assert "power" in text.lower() and "5" in text and "30" in text
-    assert "compressor" in text.lower()
+    text = str(hass.data["persistent_notification"])
+    assert "STORED" in text
+    # Guidance is specific to what was requested: the OEM power-cycle and
+    # five-start procedure only when a relearn was stored.
+    if mode in {"relearn", "superlearn"}:
+        assert "power" in text.lower() and "5" in text and "30" in text
+        assert "compressor" in text.lower()
+    elif mode == "default_ramp":
+        assert "ramp" in text.lower()
+    else:
+        assert "30 seconds" not in text
 
 
 @pytest.mark.parametrize(
@@ -141,7 +154,8 @@ async def test_write_outcomes(
     elif outcome == "INDETERMINATE":
         # The write is sent but never acknowledged; do not retry it.
         monkeypatch.setattr(
-            "custom_components.microair_bt.microair.client.STARTUP_MASK_TIMEOUT", 0.01
+            "custom_components.microair_bt.microair.client.PARAMETER_WRITE_TIMEOUT",
+            0.01,
         )
         ble.replies += [[]]
     else:
@@ -311,12 +325,17 @@ async def test_cancellation_tracks_actual_write_phase(
     with pytest.raises(asyncio.CancelledError):
         await task
     notifications = str(hass.data.get("persistent_notification", {}))
+    mask_sensor = hass.states.get("sensor.easystart_88cd_startup_mask")
+    assert mask_sensor is not None
     if phase == "preflight":
         assert "INDETERMINATE" not in notifications
         assert not any(b"SMask=" in payload for _, payload, _ in ble.clients[-1].writes)
+        assert mask_sensor.state == "0x00"
     else:
         assert "INDETERMINATE" in notifications
         assert any(b"SMask=" in payload for _, payload, _ in ble.clients[-1].writes)
+        # A write may have landed: the cached value is no longer trustworthy.
+        assert mask_sensor.state == "unavailable"
     assert not ble.clients[-1].is_connected
 
 
@@ -339,3 +358,14 @@ async def test_write_rejected_while_live_mode_active(
             return_response=True,
         )
     assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_superlearn_rejected_below_firmware_29(
+    hass: HomeAssistant, ble: BluetoothHarness, loaded: MockConfigEntry
+) -> None:
+    raw = bytearray(EEPROM)
+    raw[10] = 28
+    ble.replies = [chunks(idle_live()), chunks(bytes(raw))]
+    with pytest.raises(ServiceValidationError, match="REJECTED.*SuperLearn"):
+        await call(hass, loaded, mode="superlearn")
+    assert not any(b"SMask" in payload for _, payload, _ in ble.clients[-1].writes)

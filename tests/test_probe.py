@@ -223,7 +223,10 @@ def test_module_has_only_read_command_paths() -> None:
     }
     assert {"read_eeprom", "read_live"} <= calls
     assert not {
-        "write_startup_mask",
+        "write_startup_mode",
+        "write_startup_flag",
+        "write_scpt",
+        "write_fault_protection",
         "write_gatt_char",
         "write_gatt_descriptor",
         "_run",

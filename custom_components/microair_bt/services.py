@@ -1,11 +1,8 @@
 """Explicit startup-mode writes with conservative, operator-visible outcomes."""
 
-import asyncio
 from typing import Any, cast
 
 import voluptuous as vol
-from bleak.exc import BleakError
-from homeassistant.components import bluetooth, persistent_notification
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import (
     HomeAssistant,
@@ -14,31 +11,23 @@ from homeassistant.core import (
     SupportsResponse,
     callback,
 )
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .const import DOMAIN, SERVICE_SET_STARTUP_MODE
-from .coordinator import MicroAirConfigEntry, MicroAirCoordinator, MicroAirData
-from .microair.client import (
-    CommandFailed,
-    MicroAirClient,
-    StartupModeRejected,
-    StartupWriteState,
-)
-from .microair.protocol import ProtocolError, StartupMode, StatusCode
+from .coordinator import MicroAirConfigEntry, MicroAirCoordinator
+from .microair.protocol import StartupMode
+from .writes import async_write, startup_mode_request
+
+MODES = frozenset(mode.name.lower() for mode in StartupMode)
 
 
 def _validate_request(data: dict[str, Any]) -> dict[str, Any]:
     if data.get("confirm") is not True:
         raise ServiceValidationError("REJECTED: confirm must be true")
-    if not isinstance(data.get("mode"), str) or data.get("mode") not in {
-        "normal",
-        "relearn",
-        "default_ramp",
-    }:
+    if not isinstance(data.get("mode"), str) or data.get("mode") not in MODES:
         raise ServiceValidationError(
-            "REJECTED: mode must be normal, relearn or default_ramp"
+            f"REJECTED: mode must be one of {', '.join(sorted(MODES))}"
         )
     if bool(data.get("entry")) == bool(data.get("device")):
         raise ServiceValidationError("REJECTED: select exactly one entry or device")
@@ -78,96 +67,6 @@ def _coordinator(hass: HomeAssistant, call: ServiceCall) -> MicroAirCoordinator:
 
 
 @callback
-def _notify(coordinator: MicroAirCoordinator, outcome: str) -> None:
-    persistent_notification.async_create(
-        coordinator.hass,
-        f"{coordinator.entry.title}: {outcome}. Storage readback does not prove "
-        "that relearning has completed. If relearn was requested, follow the "
-        "Micro-Air procedure: end the cooling call at the thermostat to power "
-        "the EasyStart off, then allow 5 successful compressor starts, each "
-        "running for at least 30 seconds. Respect the air conditioner's normal "
-        "off-time and short-cycle protection between starts. This integration "
-        "does not cycle the compressor. If the result is uncertain, inspect "
-        "the startup mask before deciding whether to send another command.",
-        title="MicroAir EasyStart startup mode",
-        notification_id=f"{DOMAIN}_{coordinator.entry.entry_id}_startup_mode",
-    )
-
-
-async def _async_write(
-    coordinator: MicroAirCoordinator, mode: StartupMode
-) -> ServiceResponse:
-    # Live mode holds the single BLE central open, so a write cannot share the
-    # link. Reject early (before contending for the lock) rather than hang.
-    if coordinator.live_mode:
-        raise ServiceValidationError(
-            "REJECTED: turn off Live mode (or the Polling switch) before writing"
-        )
-    async with coordinator.lock:
-        if coordinator.stopping or not coordinator.polling_enabled:
-            raise ServiceValidationError(
-                "REJECTED: EasyStart polling is paused or unloading"
-            )
-        if not bluetooth.async_address_present(
-            coordinator.hass, coordinator.address, connectable=False
-        ):
-            raise ServiceValidationError("REJECTED: EasyStart is not advertising")
-        client: MicroAirClient | None = None
-        try:
-            client = coordinator.client_for_current_route()
-            async with client.transaction():
-                live = await client.read_live()
-                if live.status == StatusCode.UNKNOWN:
-                    raise ServiceValidationError("REJECTED: unknown EasyStart status")
-                if live.current_a > 0 and not coordinator.allow_running:
-                    raise ServiceValidationError(
-                        "REJECTED: compressor is running; allow_running is disabled"
-                    )
-                expected = await client.write_startup_mask(mode.value)
-                eeprom = await client.read_eeprom()
-                if eeprom.startup_mask != expected:
-                    raise ProtocolError("Startup mask storage readback did not match")
-        except StartupModeRejected as error:
-            raise ServiceValidationError(f"REJECTED: {error}") from error
-        except (BleakError, OSError, ProtocolError, UpdateFailed) as error:
-            phase = (
-                client.startup_write_state
-                if client
-                else StartupWriteState.NOT_ATTEMPTED
-            )
-            if phase is StartupWriteState.NOT_ATTEMPTED:
-                raise ServiceValidationError(f"REJECTED: {error}") from error
-            outcome = (
-                "ACKNOWLEDGED-BUT-UNVERIFIED"
-                if phase is StartupWriteState.ACKNOWLEDGED
-                else "FAILED"
-                if isinstance(error, CommandFailed)
-                else "INDETERMINATE"
-            )
-            _notify(coordinator, outcome)
-            coordinator.async_set_update_error(error)
-            raise HomeAssistantError(f"{outcome}: {error}") from error
-        except asyncio.CancelledError:
-            phase = (
-                client.startup_write_state
-                if client
-                else StartupWriteState.NOT_ATTEMPTED
-            )
-            if phase is not StartupWriteState.NOT_ATTEMPTED:
-                _notify(
-                    coordinator,
-                    "ACKNOWLEDGED-BUT-UNVERIFIED"
-                    if phase is StartupWriteState.ACKNOWLEDGED
-                    else "INDETERMINATE",
-                )
-            raise
-        coordinator.cache_eeprom(eeprom)
-        coordinator.async_set_updated_data(MicroAirData(eeprom, live))
-        _notify(coordinator, "STORED (startup mask matched EEPROM readback)")
-        return {"outcome": "STORED", "startup_mask": f"0x{expected:02X}"}
-
-
-@callback
 def async_register_services(hass: HomeAssistant) -> None:
     if hass.services.has_service(DOMAIN, SERVICE_SET_STARTUP_MODE):
         return
@@ -175,7 +74,8 @@ def async_register_services(hass: HomeAssistant) -> None:
     async def async_set_startup_mode(call: ServiceCall) -> ServiceResponse:
         coordinator = _coordinator(hass, call)
         mode = StartupMode[call.data["mode"].upper()]
-        return await _async_write(coordinator, mode)
+        mask = await async_write(coordinator, startup_mode_request(mode))
+        return {"outcome": "STORED", "startup_mask": f"0x{mask:02X}"}
 
     hass.services.async_register(
         DOMAIN,
