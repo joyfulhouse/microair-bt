@@ -84,3 +84,22 @@ Same link that dropped frames during live-mode polling minutes earlier
 (`Peripheral disconnected`, GATT error 133, `READ_LIVE exceeded 10s`). The
 service never retries on its own; each attempt above was a separate operator
 call. A closer proxy would remove most of this friction.
+
+## ⚠️ Powered flag stays on while idle (2026-09-21..23, unresolved)
+
+`binary_sensor.<unit>_powered` is driven by HA's advertisement tracking. It
+went off about 4.5 min after a cooling call ended during the 2026-09-21 test
+(`88CD`, connect-per-poll mode). Since then it has stayed **on for hours of
+idle time** on both units:
+
+| Unit | Mode | On from → until (UTC) | Cooling during that window |
+|---|---|---|---|
+| `88CD` | live | 09-21 19:17 → 09-22 11:22 (core restart) | one 5-min call, 22:55–23:00 |
+| `DC5A` | connect-per-poll | 09-21 22:29 → 09-22 11:22 (core restart) | frequent cycling, gaps of up to ~3 h |
+| `DC5A` | connect-per-poll | 09-22 16:15 → still on 09-23 | cycling; telemetry unavailable since 09-23 09:19 |
+
+Telemetry entities go unavailable during these windows because polls fail, so
+the integration degrades safely, but "Powered" is not a reliable "A/C is
+calling" signal. Either some installs keep the EasyStart powered (and
+advertising) while idle, or HA's presence tracking for these adverts is stale.
+Next step: capture raw advertisements during an idle window.

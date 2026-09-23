@@ -1,8 +1,9 @@
 # BLE transport — GATT, connect sequence, notifications
 
 Purpose: how bytes get to/from an EasyStart Flex over BLE (below the command layer).
-Status: **verified from source** (two independent decompile reads agree); live GATT
-properties (write type, exact descriptor set, real MTU) are ⚠️ unverified.
+Status: **verified from source** (two independent decompile reads agree) and
+**exercised live** over ESPHome proxies (reads since 2026-09-12, an `SMask` write
+2026-09-21). Write type, exact descriptor set and real MTU are still ⚠️ unverified.
 
 Command strings and reply decoding live on [ble-protocol](ble-protocol.md).
 Path shorthand: `J/` = `sources/decompiled/jadx/sources/net/microair/easystart/`,
@@ -19,7 +20,11 @@ Path shorthand: `J/` = `sources/decompiled/jadx/sources/net/microair/easystart/`
 
 **No pairing, bonding, application password, challenge, or checksum exists in
 the app** (`J/Connect.java:349,406`, `J/MainActivityKt.java:378`, manifest). This
-does not prove the peripheral never requires link encryption — ⚠️ unverified live.
+does not prove the peripheral never requires link encryption on every stack,
+but over HA's ESPHome proxies both units accept reads and an `SMask` write
+**with no pairing or bonding** (verified 2026-09-12 and 2026-09-21). The one
+`NotAuthorized` seen (2026-09-10) came from a desktop BlueZ adapter, not the
+production path.
 
 **Write type**: the app calls the legacy one-arg `writeCharacteristic()` after
 `setValue(String)` and never calls `setWriteType`, so Android's default for the
@@ -36,7 +41,8 @@ write-with-response if both are offered.
   service-UUID, manufacturer-data, RSSI or MAC filter.
 - App-side ID validation: `EasyStart_` + 4 chars (length 14) selects one unit;
   length 10 or empty = any unit (`J/Connect.java:594,643-650`). Real advertised
-  name/suffix alphabet is ⚠️ unverified — see [ha-proxy-coverage](ha-proxy-coverage.md).
+  names observed: `EasyStart_88CD`, `EasyStart_DC5A` (4 uppercase hex digits) — see
+  [ha-proxy-coverage](ha-proxy-coverage.md).
 - Scan budget in app: 5 × 1 s polls, then "Cannot find EasyStart" (`J/Connect.java:380-404`).
 
 ## Connect sequence (as the app does it)
@@ -85,10 +91,13 @@ Consequences for an HA client:
   CRC. Chunk boundaries are MTU-driven; concatenate chunks in order until the
   completion text arrives. The app zero-fills and resets the buffer before each
   read command (`J/Connect.java:321-326`, `J/Status.java:59-64`).
-- The **exact completion text is unknown** (only the substrings are matched)
-  — ⚠️ unverified; log it verbatim on first live contact.
-- The first two bytes of both binary replies are never decoded by the app —
-  ⚠️ unverified meaning (possibly a length/echo header). Field offsets on
+- The **success completion is exactly `{"Sts": Success}`** (verified live;
+  the client also tolerates trailing CR/LF/NUL). The failure text is assumed
+  to be `{"Sts": Fail}` by symmetry — ⚠️ never observed live.
+- The first two bytes of both binary replies are never decoded by the app.
+  On `ReadEEP` they are the **remaining payload length** (u16 LE, verified on
+  live captures; the integration uses it to reject truncated images). On
+  `ReadLive` the meaning is ⚠️ unverified. Field offsets on
   [available-data](available-data.md) are *buffer* offsets including them.
 - A binary chunk that happened to contain ASCII `Success`/`Fail` would be
   misrouted by the app; a robust client should only treat a notification as

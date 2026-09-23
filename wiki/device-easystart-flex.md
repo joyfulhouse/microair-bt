@@ -18,7 +18,7 @@ community C1–C13) and the APK reads cited on [ble-protocol](ble-protocol.md).
 | BLE local name | `EasyStart_` + 4 chars, case-sensitive (manual example `EasyStart_CFFA`; observed `EasyStart_25AC`) | O2, C2, C7 |
 | GATT | ST "BLE Chat/UART" sample profile — service `d973f2e0…`, notify `…f2e1`, write `…f2e2` | [ble-transport](ble-transport.md), C13 |
 | Address type / stability | ⚠️ unverified — one report of a PUBLIC address, another of the MAC changing after hours | C2, C3 |
-| Pairing | none in app; ⚠️ unverified on device | [ble-transport](ble-transport.md) |
+| Pairing | none in app; **none needed** over HA's ESPHome proxies (reads + write verified 2026-09-21) | [ble-transport](ble-transport.md) |
 | Concurrency | **only one BLE client at a time** (the OEM app must be closed for HA to connect) | O2 |
 | Power / advertising | powered from the A/C control circuit; community reports it **advertises only while the HVAC is calling** (i.e. while the unit has power) | O2, C2, C3 |
 | Range | short — community recommends a proxy within ~3–6 ft | C3 |
@@ -94,6 +94,12 @@ Flex row is `398BT,26,0,0,0,E8,398ULBT-B38.eep,398ULBT-B38.hex`, files dated
 | Stall | 5 red | self-reset | failed start; **bad learn data** is a listed cause |
 | Wrong Line Voltage | 6 red | Lockout | 120 V models only |
 | Miswiring / Start Winding Not Detected | 7 red | Lockout | |
+
+**Observed on both house units (2026-09-21..23):** the status reads **Power
+Interruption** at the end of some cooling calls (`88CD` 2026-09-21 23:00 UTC;
+`DC5A` 09-22 03:26 and 09-23 03:37) and returns to Normal on the next cycle.
+Likely the call ending while the compressor runs, but ⚠️ unconfirmed. The
+integration's Fault binary sensor turns on for it.
 
 Non-Bluetooth 364/368 boards have a JP1 jumper relearn (pins 4–6); **the Flex
 has no documented non-BLE reset** and Micro-Air warns not to open Bluetooth

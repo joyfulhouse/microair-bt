@@ -22,9 +22,9 @@ async def async_setup_entry(
 
 
 class MicroAirStartupModeSelect(MicroAirControlEntity, SelectEntity):
-    """Disabled by default: relearn is a learn/reset command, and the write
-    path is not yet verified on hardware, so enabling this entity is the
-    operator's explicit confirmation (the service keeps its confirm flag)."""
+    """Disabled by default: relearn erases the learned profile and lifetime
+    counters at the next power-up, so enabling this entity is the operator's
+    explicit confirmation (the service keeps its confirm flag)."""
 
     _attr_name = "Startup mode"
     _attr_entity_category = EntityCategory.CONFIG

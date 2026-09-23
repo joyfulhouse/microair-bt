@@ -38,3 +38,15 @@ Process artifact; durable facts are folded into `wiki/index.md`,
 
 See `wiki/ble-protocol.md` → "What the app does NOT tell us — resolved live".
 Open: whether bit 0 clears after the fifth learning start; SCPT/FMask writes.
+
+## Follow-up (2026-09-23)
+
+- Learning start 2 logged at 2026-09-21 22:55 UTC (Learned 2, Total Starts 2);
+  status Power Interruption at 23:00 when that 5-minute call ended. No upstairs
+  cooling call since, so learning is paused at 2 / 5.
+- Mask still reported `0x01` after start 2 (possibly the cached image; live
+  mode refreshes the EEPROM hourly).
+- v0.5.0 became active at the 2026-09-22 11:23 UTC core restart.
+- `binary_sensor.easystart_88cd_powered` stayed on from 19:17 until that
+  restart despite no cooling after 23:00; recorded as an open question in
+  `wiki/ha-proxy-coverage.md`.

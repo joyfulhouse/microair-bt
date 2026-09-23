@@ -6,7 +6,8 @@ Purpose: the complete application-layer wire protocol of the EasyStart Flex
 Status: **verified from source** — two independent decompile reads
 (`docs/claude/research/explore-apk-protocol-openai.md`,
 `…-anthropic.md`) agree on all 24 command forms and every byte offset. Firmware
-*behaviour* after a write is ⚠️ unverified until a live test.
+*behaviour* after an `SMask` relearn write is **verified live** (2026-09-21, see below);
+after `SCPT` / `FMask` writes it is ⚠️ unverified.
 
 Transport (UUIDs, connect sequence, chunking) is on [ble-transport](ble-transport.md).
 Decoded telemetry fields are on [available-data](available-data.md).
@@ -122,7 +123,9 @@ telemetry via the v0.4.0 integration over an ESPHome proxy.
   Faults 0, Last Start Peak 0.0 A, then Learned Starts 1 / Total Starts 1 /
   peak 18.5 A about 20 s later (≈ 2 s SCPT delay shown before the start).
 - **Bit 0 does not self-clear after the first learning start** (`0x01` read
-  through 4+ min of the first learning run). ⚠️ Still unknown whether it clears
+  through 4+ min of the first learning run). It still read `0x01` after the
+  second start (2026-09-21 22:55 UTC; ⚠️ live mode refreshes the EEPROM image
+  hourly, so that value may be cached). ⚠️ Still unknown whether it clears
   after the fifth start.
 - **A power cycle is required** (ending the cooling call de-powers the unit;
   HA marks it unpowered ~4.5 min after the last advertisement).
@@ -163,7 +166,7 @@ as a disabled-by-default switch and refuses to clear the last set bit.
 
 | Buffer idx | Meaning | Evidence |
 |---|---|---|
-| 0–1 | opaque prefix (skipped when the app re-serialises the dump) | `J/Diagnose.java:185,206` |
+| 0–1 | **remaining payload length**, u16 little-endian (`FD 03` = 1021 → 1023-byte buffer); the app skips it when re-serialising the dump. Verified on live captures (`tests/fixtures/capture-08-ReadEEP.bin`; `capture-06` is a truncated read whose prefix still says 1021) | `J/Diagnose.java:185,206`, captures |
 | 2–8 | 7-char model string: `364ULBT`, `368ULBT`, `398ULBT` (**Flex**), `399BT` (Breeze) | `J/Update.java:362-380` |
 | 10 | firmware version, unsigned int (≥ 29 unlocks hidden modes) | `J/MainActivityKt.java:40`, `J/Relearn.java:353` |
 | 906 | SMask (startup mask) | `J/MainActivityKt.java:42` |

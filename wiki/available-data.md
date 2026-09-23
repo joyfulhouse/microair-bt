@@ -3,7 +3,7 @@
 Purpose: every field the EasyStart app decodes, with offsets, units and scaling,
 so the integration can map them to HA entities.
 Status: **verified from source** (`J/Status.java:96-119`, `J/Relearn.java`,
-`J/Faults.java`); real values ⚠️ unverified until a live read.
+`J/Faults.java`) and **confirmed by live reads** of both units since 2026-09-12.
 
 Where the bytes come from: [ble-protocol](ble-protocol.md). Offsets are into
 the concatenated notification buffer (they include the 2 opaque prefix bytes).

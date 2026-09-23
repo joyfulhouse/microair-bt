@@ -35,11 +35,15 @@ verified `398ULBT`.
 ## Entities
 
 - `sensor` — status, current, line frequency, last start peak, short-cycle
-  delay, learned starts, total starts, total faults; diagnostic model,
-  firmware, startup mask.
+  delay, learned starts, total starts, total faults, estimated power;
+  diagnostic model, firmware, startup mask, fault mask.
 - `binary_sensor` — powered (advertising), fault.
-- `switch` — polling (pause/resume all BLE traffic; persists).
-- Service `microair_bt.set_startup_mode` — see the README before using it.
+- `switch` — polling (pause/resume all BLE traffic; persists), no power-up
+  delay; disabled by default: start delay mode and seven fault protections.
+- `select` — startup mode (disabled by default; enable it to confirm).
+- `number` — short-cycle protection timer (1-250 min).
+- Service `microair_bt.set_startup_mode` — see the README before using it or
+  any control: every write is readback-verified and never retried.
 
 ## Troubleshooting
 

@@ -38,7 +38,8 @@ locally, without the vendor app.
 > profile and lifetime counters and logged learning start 1). The SCPT and
 > fault-protection writes added in 0.5.0 are **not yet verified on hardware**;
 > treat those controls as experimental until [`wiki/index.md`](wiki/index.md)
-> says otherwise. Expect REJECTED outcomes on weak proxy links (a dropped frame
+> says otherwise. Version 0.5.0 runs in the author's production Home Assistant
+> against two units. Expect REJECTED outcomes on weak proxy links (a dropped frame
 > in the pre-write EEPROM read); a rejected call sends nothing and is safe to
 > repeat.
 
@@ -175,7 +176,7 @@ been read and while **Live mode** holds the connection.
 | Entity | Type | Description |
 |---|---|---|
 | Polling | switch | Pause/resume all BLE reads and writes; available even while unpowered |
-| Startup mode | select | *Disabled by default* until the write path is verified live (enabling it is your explicit confirmation). `normal`, `relearn`, `default_ramp`; `superlearn` (the app's hidden long-press variant of relearn) appears for firmware 29+. Selecting `relearn` sends the relearn instruction and posts the OEM power-cycle procedure |
+| Startup mode | select | *Disabled by default*: enabling it is your explicit confirmation, like the service's `confirm` flag. `normal`, `relearn`, `default_ramp`; `superlearn` (the app's hidden long-press variant of relearn) appears for firmware 29+. Selecting `relearn` sends the relearn instruction and posts the OEM power-cycle procedure |
 | No power-up delay | switch | Startup-mask bit 2, the app's "No Pwr-Up Delay" |
 | Start delay mode | switch | *Disabled by default.* Hidden app mode (bit 3) that turns the SCPT byte into a start delay |
 | Short-cycle protection timer | number | SCPT, 1-250 whole minutes; attribute `interpretation` reports `start_delay` when the hidden mode is set |
@@ -197,6 +198,24 @@ the EEPROM, and returns `STORED` only when the readback matches. Outcomes are
 also posted as a persistent notification. **The integration never cycles the
 compressor**: after a `relearn`, follow the Micro-Air procedure (end the cooling
 call so the unit powers off, then allow five successful starts of at least 30 s).
+
+### What a relearn does
+
+Storing `relearn` only sets a flag. At the **next power-up** (the next cooling
+call after the unit has powered off) the EasyStart erases its learned profile
+**and its lifetime counters**: Learned starts, Total starts, Total faults and
+Last start peak all drop to 0, then Learned starts counts up as the compressor
+completes learning starts. Five successful starts of at least 30 s finish the
+learn. Normal thermostat cycling completes them; the integration never cycles
+the compressor.
+
+### Firmware updates
+
+Micro-Air publishes firmware for the EasyStart over its own app. The
+integration **cannot and will not** send any firmware-update command. Update
+with the OEM EasyStart app, with the A/C calling for the whole flash and the
+integration's **Polling** switch off. An update rewrites the unit's EEPROM,
+so the unit learns again afterwards.
 
 ## Automation Examples
 
