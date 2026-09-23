@@ -6,9 +6,11 @@ Guidance for Claude Code (and humans) working in this repo.
 
 Reverse-engineering the **MicroAir EasyStart Flex** home A/C soft starter's BLE
 protocol (OEM Android app `net.microair.easystart`, "EasyStart") and building a
-**local Home Assistant Bluetooth integration** — no cloud. The immediate goal
-is to **reset the unit's learned start profile** (and read faults/status) from
-HA, because a stale learned profile can keep the compressor from starting.
+**local Home Assistant Bluetooth integration** — no cloud. The original goal,
+**resetting the unit's learned start profile** from HA, is met (relearn
+verified live 2026-09-21); since v0.5.0 the integration covers every parameter
+the OEM app can write (startup mask, SCPT, fault-enable mask). Current status
+and open questions: [`wiki/index.md`](wiki/index.md).
 
 Sibling project and structural template: `../fogmachine-bt` (same layout, same
 wiki pattern, same tooling).
@@ -49,8 +51,12 @@ before editing the wiki.
 - This device switches a **mains-powered A/C compressor**. Prefer a
   **read-only probe first** (connect, enable notifications, read status) before
   sending any write.
-- Never send an untested write while the A/C is calling for cooling. Gate
-  reset/learn commands behind explicit confirmation until verified live.
+- Never send an untested write while the A/C is calling for cooling. Keep
+  writes behind explicit confirmation: the service's `confirm` flag and
+  disabled-by-default entities. The relearn write is verified live; SCPT and
+  FMask writes are not, so treat the first of each as a supervised test.
+- Never send firmware-update commands. OEM images under `sources/firmware/`
+  are evidence only.
 
 ## Next steps
 

@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mesh (2026-09-21): STORED `0x01`; next power-up reset learned starts and the
   lifetime start/fault counters to 0 and logged learning start 1. See
   `wiki/ble-protocol.md` and `docs/claude/research/live-relearn-validation-2026-09-21.md`.
+- Upstairs relearn progress: 2 of 5 learning starts as of 2026-09-23; the
+  relearn flag was still set after the second.
+
+### Documentation
+
+- README: what a relearn does to the counters, and how firmware updates work
+  (OEM app only). INSTALL: entity list brought up to 0.5.0.
+- Wiki: status as of 2026-09-23, open questions (Powered flag staying on while
+  idle, Power Interruption at call end), and transport facts settled by live
+  captures (no pairing needed over proxies, exact success envelope, ReadEEP
+  length prefix). OEM firmware B38 archived under `sources/firmware/` as
+  evidence (not applied).
 
 ## [0.5.0] - 2026-09-21
 

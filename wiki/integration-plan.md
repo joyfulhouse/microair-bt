@@ -3,9 +3,14 @@
 Purpose: the design and acceptance contract for the local-BLE Home Assistant
 integration for the MicroAir EasyStart Flex. This page *is* the spec handed to
 the implementer.
-Status: **planned** — v1.0 drafted 2026-09-10; **v1.1 after a three-vendor
-/debate (REVISE × 3)**, synthesis in `docs/claude/research/debate-spec-synthesis.md`.
-Items marked ⚠️ are resolved by evidence gates named in §12.
+Status: **verified (implemented)** — v1.0 drafted 2026-09-10; v1.1 after a
+three-vendor /debate (REVISE × 3), synthesis in
+`docs/claude/research/debate-spec-synthesis.md`. Shipped as v0.2.0–v0.5.0; the
+evidence gates in §12 are closed (G1 2026-09-12, G2 relearn write 2026-09-21).
+This page is kept for design rationale. Where it differs from the code, the
+code and README win; notable divergences: no rate limit or `allow_repeat`,
+no `ALREADY_SET` outcome, and v0.5.0 widened the scope (see the superseded
+non-goals below).
 
 Facts this design rests on: [ble-transport](ble-transport.md),
 [ble-protocol](ble-protocol.md), [available-data](available-data.md),
@@ -214,7 +219,7 @@ No button entity.
 Fields: `device_id` (target); `mode`: `normal` | `relearn` | `default_ramp`;
 `confirm: bool` (**must be `true`**, else `ServiceValidationError`);
 `allow_running: bool = false`; `allow_repeat: bool = false`.
-(`default_ramp` is admitted pending the plan-gate ruling; if deferred, the
+(`default_ramp` shipped in v0.2.0; the original text read: admitted pending the plan-gate ruling; if deferred, the
 enum is `normal | relearn` and nothing else changes.)
 
 Flow — one transaction, one connection:
